@@ -5,7 +5,8 @@ from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from model import *
-from load_dataset import SatelliteImageDataset, group_image_paths
+from utils import get_image_path
+from load_dataset import SatelliteImageDataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -17,10 +18,16 @@ S2_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()
                                                torchvision.transforms.Normalize(mean=1595.74, std=838.34)])
 transforms = {"MODIS": MODIS_transform, "S1": S1_transform, "S2": S2_transform}
 
-dataset = SatelliteImageDataset(group_image_paths, transform=transforms)
+train_image_paths, val_image_paths, test_image_paths = get_image_path()
+
+train_dataset = SatelliteImageDataset(train_image_paths, transform=transforms)
+val_dataset = SatelliteImageDataset(val_image_paths, transform=transforms)
+test_dataset = SatelliteImageDataset(test_image_paths, transform=transforms)
 
 batch_size = 64
-dataloader = DataLoader(dataset, batch_size, shuffle=True, drop_last=True)
+train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size, shuffle=True)
 
 generator = Generator()
 discriminator = Discriminator()
@@ -28,7 +35,7 @@ generator = generator.to(device)
 discriminator = discriminator.to(device)
 
 g_lr = 1e-3
-d_lr = 2e-4
+d_lr = 1e-4
 # g_optimizer = torch.optim.RMSprop(generator.parameters(), lr=g_lr)
 # d_optimizer = torch.optim.RMSprop(discriminator.parameters(), lr=d_lr)
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
@@ -45,16 +52,14 @@ discriminator.train()
 loss_fn = nn.BCELoss()
 loss_fn = loss_fn.to(device)
 
-true_label = torch.ones((batch_size, 1)).to(device)
-false_label = torch.zeros((batch_size, 1)).to(device)
-
-epochs = 100
+epochs = 10
 step = 0
 start_time = time.time()
 for epoch in range(epochs):
     print("=" * 30 + f" epoch {epoch + 1} " + "=" * 30)
 
-    for mini_batch in dataloader:
+    # train
+    for mini_batch in train_dataloader:
         MODIS_image, S1_image, S2_image = mini_batch
         MODIS_image = MODIS_image.to(device)
         S1_image = S1_image.to(device)
@@ -67,6 +72,9 @@ for epoch in range(epochs):
         L2_loss_bands = ((g_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
         L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
         L2_loss = L2_loss_bands.mean()
+
+        true_label = torch.ones((real_S2_image.shape[0], 1)).to(device)
+        false_label = torch.zeros((real_S2_image.shape[0], 1)).to(device)
 
         # 每3个step更新一次生成器参数
         if step % 3 == 0:
@@ -92,20 +100,45 @@ for epoch in range(epochs):
 
         if step % 10 == 0:
             end_time = time.time()
-            print("训练次数：{}，g_loss：{}，d_loss：{}，L2_loss：{} {}s".format(
+            print("训练次数：{}，g_loss：{}，d_loss：{}，train_L2_loss：{} {}s".format(
                 step, g_loss.item(), d_loss.item(), L2_loss_bands.mean().item(), round(end_time - start_time, 2)))
+
             with torch.no_grad():
                 print(discriminator(g_S2_image).mean().item(), discriminator(real_S2_image).mean().item())
 
             writer.add_scalar("g_loss", g_loss, step)
             writer.add_scalar("d_loss", d_loss, step)
-            writer.add_scalar("L2_loss", L2_loss, step)
-            for band in range(L2_loss_bands.shape[0]):
-                writer.add_scalar("L2_loss_band_" + str(band + 1), L2_loss_bands[band], step)
+            writer.add_scalar("train_L2_loss", L2_loss, step)
+            # for band in range(L2_loss_bands.shape[0]):
+            #     writer.add_scalar("train_L2_loss_band_" + str(band + 1), L2_loss_bands[band], step)
 
         step += 1
-        g_scheduler.step()
-        d_scheduler.step()
+
+    g_scheduler.step()
+    d_scheduler.step()
+
+    # validate
+    val_L2_loss_bands = torch.zeros(8).to(device)
+    for mini_batch in val_dataloader:
+        MODIS_image, S1_image, S2_image = mini_batch
+        MODIS_image = MODIS_image.to(device)
+        S1_image = S1_image.to(device)
+        real_S2_image = S2_image.to(device)
+
+        with torch.no_grad():
+            g_S2_image = generator(S1_image, MODIS_image)
+
+        L2_loss_bands = ((g_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
+        L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
+        val_L2_loss_bands += L2_loss_bands
+
+    val_L2_loss_bands /= len(val_dataloader)
+    val_L2_loss = val_L2_loss_bands.mean()
+    print(f"val_L2_loss：{val_L2_loss}")
+
+    writer.add_scalar("val_L2_loss", val_L2_loss, epoch)
+    # for band in range(L2_loss_bands.shape[0]):
+    #     writer.add_scalar("val_L2_loss_band_" + str(band + 1), val_L2_loss_bands[band], epoch)
 
 writer.close()
 torch.save(generator, f"../model/GAN_generator_epoch_{epochs}.pth")

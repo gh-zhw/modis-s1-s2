@@ -1,16 +1,6 @@
-import glob
-from torch.utils.data import Dataset
 import numpy as np
-
-MODIS_dir = "../dataset/MODIS/MODIS_*.npy"
-S1_dir = "../dataset/Sentinel-1/S1_*.npy"
-S2_dir = "../dataset/Sentinel-2/S2_*.npy"
-
-MODIS_image_paths = glob.glob(MODIS_dir)
-S1_image_paths = glob.glob(S1_dir)
-S2_image_paths = glob.glob(S2_dir)
-group_image_paths = list(zip(MODIS_image_paths, S1_image_paths, S2_image_paths))
-group_num = len(group_image_paths)
+from torch.utils.data import Dataset
+from utils import get_image_path
 
 
 class SatelliteImageDataset(Dataset):
@@ -40,7 +30,10 @@ class SatelliteImageDataset(Dataset):
 
 
 if __name__ == '__main__':
-    sate_data = SatelliteImageDataset(group_image_paths)
-    print(len(sate_data))
-    print(sate_data[0][0].shape, sate_data[0][1].shape, sate_data[0][2].shape)
+    train_image_paths, val_image_paths, test_image_paths = get_image_path()
+
+    train_images = SatelliteImageDataset(train_image_paths)
+    val_images = SatelliteImageDataset(val_image_paths)
+    test_images = SatelliteImageDataset(test_image_paths)
+    print(len(train_images), len(val_images), len(test_images))
     # sate_data[0]

@@ -1,7 +1,4 @@
 .idea
 logs
 model
-dataset/MODIS
-dataset/Sentinel-1
-dataset/Sentinel-2
-dataset/SatelliteData.zip
+dataset/SatelliteImages
