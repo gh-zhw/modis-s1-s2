@@ -24,10 +24,10 @@ train_dataset = SatelliteImageDataset(train_image_paths, transform=transforms)
 val_dataset = SatelliteImageDataset(val_image_paths, transform=transforms)
 test_dataset = SatelliteImageDataset(test_image_paths, transform=transforms)
 
-batch_size = 64
-train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size, shuffle=True)
+batch_size = 16
+train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True, drop_last=False)
+val_dataloader = DataLoader(val_dataset, batch_size, shuffle=True, drop_last=False)
+test_dataloader = DataLoader(test_dataset, batch_size, shuffle=True, drop_last=False)
 
 generator = Generator()
 discriminator = Discriminator()
@@ -35,7 +35,7 @@ generator = generator.to(device)
 discriminator = discriminator.to(device)
 
 g_lr = 1e-3
-d_lr = 1e-4
+d_lr = 1e-3
 # g_optimizer = torch.optim.RMSprop(generator.parameters(), lr=g_lr)
 # d_optimizer = torch.optim.RMSprop(discriminator.parameters(), lr=d_lr)
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
@@ -66,33 +66,32 @@ for epoch in range(epochs):
         real_S2_image = S2_image.to(device)
 
         # 生成超分辨率图像
-        g_S2_image = generator(S1_image, MODIS_image)  # 一定要按顺序！！！
+        generated_S2_image = generator(MODIS_image, S1_image)
 
         # 计算各波段的L2损失
-        L2_loss_bands = ((g_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
+        L2_loss_bands = ((generated_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
         L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
         L2_loss = L2_loss_bands.mean()
 
         true_label = torch.ones((real_S2_image.shape[0], 1)).to(device)
         false_label = torch.zeros((real_S2_image.shape[0], 1)).to(device)
 
-        # 每3个step更新一次生成器参数
-        if step % 3 == 0:
-            g_optimizer.zero_grad()
-            # g_loss = -torch.mean(discriminator(g_S2_image))
-            g_loss = loss_fn(discriminator(g_S2_image), true_label) + L2_loss
-            g_loss.backward()
-            g_optimizer.step()
+        g_optimizer.zero_grad()
+        # g_loss = -torch.mean(discriminator(g_S2_image))
+        g_loss = loss_fn(discriminator(generated_S2_image), true_label) + L2_loss
+        g_loss.backward()
+        g_optimizer.step()
 
         # 更新判别器参数
-        d_optimizer.zero_grad()
-        # d_fake_loss = torch.mean(discriminator(g_S2_image.detach()))
-        # d_real_loss = -torch.mean(discriminator(real_S2_image))
-        d_fake_loss = loss_fn(discriminator(g_S2_image.detach()), false_label)
-        d_real_loss = loss_fn(discriminator(real_S2_image), true_label)
-        d_loss = d_fake_loss + d_real_loss
-        d_loss.backward()
-        d_optimizer.step()
+        if step % 5 == 0:
+            d_optimizer.zero_grad()
+            # d_fake_loss = torch.mean(discriminator(g_S2_image.detach()))
+            # d_real_loss = -torch.mean(discriminator(real_S2_image))
+            d_fake_loss = loss_fn(discriminator(generated_S2_image.detach()), false_label)
+            d_real_loss = loss_fn(discriminator(real_S2_image), true_label)
+            d_loss = d_fake_loss + d_real_loss
+            d_loss.backward()
+            d_optimizer.step()
 
         # clip param for discriminator
         # for parm in discriminator.parameters():
@@ -104,7 +103,7 @@ for epoch in range(epochs):
                 step, g_loss.item(), d_loss.item(), L2_loss_bands.mean().item(), round(end_time - start_time, 2)))
 
             with torch.no_grad():
-                print(discriminator(g_S2_image).mean().item(), discriminator(real_S2_image).mean().item())
+                print(discriminator(generated_S2_image).mean().item(), discriminator(real_S2_image).mean().item())
 
             writer.add_scalar("g_loss", g_loss, step)
             writer.add_scalar("d_loss", d_loss, step)
@@ -126,9 +125,9 @@ for epoch in range(epochs):
         real_S2_image = S2_image.to(device)
 
         with torch.no_grad():
-            g_S2_image = generator(S1_image, MODIS_image)
+            generated_S2_image = generator(MODIS_image, S1_image)
 
-        L2_loss_bands = ((g_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
+        L2_loss_bands = ((generated_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
         L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
         val_L2_loss_bands += L2_loss_bands
 
