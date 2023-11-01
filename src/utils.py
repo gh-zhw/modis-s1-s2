@@ -1,3 +1,5 @@
+import glob
+
 import numpy as np
 
 
@@ -52,7 +54,13 @@ def calc_statistics(image_paths):
 
 
 if __name__ == '__main__':
-    from load_dataset import MODIS_image_paths, S1_image_paths, S2_image_paths
+    MODIS_dir = "../dataset/SatelliteImages/MODIS/MODIS_*.npy"
+    S1_dir = "../dataset/SatelliteImages/S1/S1_*.npy"
+    S2_dir = "../dataset/SatelliteImages/S2/S2_*.npy"
+
+    MODIS_image_paths = glob.glob(MODIS_dir)
+    S1_image_paths = glob.glob(S1_dir)
+    S2_image_paths = glob.glob(S2_dir)
 
     min_val, max_val, mean, std = calc_statistics(S2_image_paths)
 

@@ -13,9 +13,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MODIS_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
                                                   torchvision.transforms.Normalize(mean=1291.39, std=734.66)])
 S1_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                               torchvision.transforms.Normalize(mean=-12.77, std=5.45)])
+                                               torchvision.transforms.Normalize(mean=-12.80, std=5.50)])
 S2_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                               torchvision.transforms.Normalize(mean=1595.74, std=838.34)])
+                                               torchvision.transforms.Normalize(mean=1599.95, std=850.08)])
 transforms = {"MODIS": MODIS_transform, "S1": S1_transform, "S2": S2_transform}
 
 train_image_paths, val_image_paths, test_image_paths = get_image_path()
