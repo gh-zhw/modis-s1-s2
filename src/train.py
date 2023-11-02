@@ -1,4 +1,6 @@
 import time
+
+import numpy as np
 import torch
 import torchvision
 from torch.optim import lr_scheduler
@@ -36,8 +38,6 @@ discriminator = discriminator.to(device)
 
 g_lr = 1e-3
 d_lr = 1e-3
-# g_optimizer = torch.optim.RMSprop(generator.parameters(), lr=g_lr)
-# d_optimizer = torch.optim.RMSprop(discriminator.parameters(), lr=d_lr)
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
 d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_lr)
 g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.8)
@@ -52,7 +52,14 @@ discriminator.train()
 loss_fn = nn.BCELoss()
 loss_fn = loss_fn.to(device)
 
-epochs = 10
+train_loss = {"g_loss": [], "d_loss": [], "L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [],
+              "L2_loss_band_3": [], "L2_loss_band_4": [], "L2_loss_band_5": [], "L2_loss_band_6": [],
+              "L2_loss_band_7": [], "L2_loss_band_8": []}
+val_loss = {"L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [], "L2_loss_band_3": [],
+            "L2_loss_band_4": [], "L2_loss_band_5": [], "L2_loss_band_6": [], "L2_loss_band_7": [],
+            "L2_loss_band_8": []}
+
+epochs = 5
 step = 0
 start_time = time.time()
 for epoch in range(epochs):
@@ -77,39 +84,39 @@ for epoch in range(epochs):
         false_label = torch.zeros((real_S2_image.shape[0], 1)).to(device)
 
         g_optimizer.zero_grad()
-        # g_loss = -torch.mean(discriminator(g_S2_image))
         g_loss = loss_fn(discriminator(generated_S2_image), true_label) + L2_loss
         g_loss.backward()
         g_optimizer.step()
 
         # 更新判别器参数
-        if step % 5 == 0:
+        if step % 3 == 0:
             d_optimizer.zero_grad()
-            # d_fake_loss = torch.mean(discriminator(g_S2_image.detach()))
-            # d_real_loss = -torch.mean(discriminator(real_S2_image))
             d_fake_loss = loss_fn(discriminator(generated_S2_image.detach()), false_label)
             d_real_loss = loss_fn(discriminator(real_S2_image), true_label)
             d_loss = d_fake_loss + d_real_loss
             d_loss.backward()
             d_optimizer.step()
 
-        # clip param for discriminator
-        # for parm in discriminator.parameters():
-        #     parm.data.clamp_(-0.01, 0.01)
-
         if step % 10 == 0:
             end_time = time.time()
             print("训练次数：{}，g_loss：{}，d_loss：{}，train_L2_loss：{} {}s".format(
-                step, g_loss.item(), d_loss.item(), L2_loss_bands.mean().item(), round(end_time - start_time, 2)))
+                step, g_loss.item(), d_loss.item(), L2_loss.item(), round(end_time - start_time, 2)))
 
             with torch.no_grad():
                 print(discriminator(generated_S2_image).mean().item(), discriminator(real_S2_image).mean().item())
+
+            train_loss["g_loss"].append(g_loss.item())
+            train_loss["d_loss"].append(d_loss.item())
+            train_loss["L2_loss"].append(L2_loss.item())
+            for band in range(L2_loss_bands.shape[0]):
+                train_loss[f"L2_loss_band_{band+1}"].append(L2_loss_bands[band].item())
 
             writer.add_scalar("g_loss", g_loss, step)
             writer.add_scalar("d_loss", d_loss, step)
             writer.add_scalar("train_L2_loss", L2_loss, step)
             # for band in range(L2_loss_bands.shape[0]):
-            #     writer.add_scalar("train_L2_loss_band_" + str(band + 1), L2_loss_bands[band], step)
+            #     writer.add_scalar("train_L2_loss_band_" + str(band + 1), L2_loss_bands[band].item(), step)
+
 
         step += 1
 
@@ -135,11 +142,19 @@ for epoch in range(epochs):
     val_L2_loss = val_L2_loss_bands.mean()
     print(f"val_L2_loss：{val_L2_loss}")
 
+    val_loss["L2_loss"].append(val_L2_loss.item())
+    for band in range(val_L2_loss_bands.shape[0]):
+        val_loss[f"L2_loss_band_{band + 1}"].append(val_L2_loss_bands[band].item())
+
     writer.add_scalar("val_L2_loss", val_L2_loss, epoch)
     # for band in range(L2_loss_bands.shape[0]):
-    #     writer.add_scalar("val_L2_loss_band_" + str(band + 1), val_L2_loss_bands[band], epoch)
+    #     writer.add_scalar("val_L2_loss_band_" + str(band + 1), val_L2_loss_bands[band].item(), epoch)
 
 writer.close()
+
+np.save(r"D:\Code\MODIS_S1_S2\output\loss\train_loss.npy", train_loss)
+np.save(r"D:\Code\MODIS_S1_S2\output\loss\val_loss.npy", val_loss)
+
 torch.save(generator, f"../model/GAN_generator_epoch_{epochs}.pth")
 torch.save(discriminator, f"../model/GAN_discriminator_epoch_{epochs}.pth")
 

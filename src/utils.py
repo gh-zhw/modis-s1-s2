@@ -1,5 +1,4 @@
-import glob
-
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -53,15 +52,23 @@ def calc_statistics(image_paths):
     return min_val, max_val, mean, std
 
 
+def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
+    loss_dict = np.load(loss_npy, allow_pickle=True).item()
+    plt.figure(dpi=300, figsize=(12, 8))
+    for i, loss_key in enumerate(loss_dict.keys()):
+        loss_value = loss_dict[loss_key]
+        value_len_range = np.arange(len(loss_value))
+        plt.xticks(value_len_range, value_len_range * xtick_gain, rotation=45)
+        plt.xlabel(x_label)
+        plt.ylabel("loss")
+        plt.plot(value_len_range, loss_value, label=loss_key, c="r")
+        plt.legend()
+        plt.savefig(loss_pic_dir + loss_key + ".png")
+        # 清空绘图
+        plt.cla()
+
+
 if __name__ == '__main__':
-    MODIS_dir = "../dataset/SatelliteImages/MODIS/MODIS_*.npy"
-    S1_dir = "../dataset/SatelliteImages/S1/S1_*.npy"
-    S2_dir = "../dataset/SatelliteImages/S2/S2_*.npy"
+    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\train_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
 
-    MODIS_image_paths = glob.glob(MODIS_dir)
-    S1_image_paths = glob.glob(S1_dir)
-    S2_image_paths = glob.glob(S2_dir)
-
-    min_val, max_val, mean, std = calc_statistics(S2_image_paths)
-
-    print(min_val, max_val, mean, std)
+    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\val_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
