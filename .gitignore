@@ -1,4 +1,5 @@
 .idea
 logs
 model
+output
 dataset/SatelliteImages

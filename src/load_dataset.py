@@ -1,5 +1,6 @@
 import numpy as np
-from torch.utils.data import Dataset
+import torchvision
+from torch.utils.data import Dataset, DataLoader
 from utils import get_image_path
 
 
@@ -29,11 +30,31 @@ class SatelliteImageDataset(Dataset):
         return MODIS_image, S1_image, S2_image
 
 
-if __name__ == '__main__':
+def get_dataset():
+    MODIS_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
+                                                      torchvision.transforms.Normalize(mean=1291.39, std=734.66)])
+    S1_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
+                                                   torchvision.transforms.Normalize(mean=-12.80, std=5.50)])
+    S2_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
+                                                   torchvision.transforms.Normalize(mean=1599.95, std=850.08)])
+    transforms = {"MODIS": MODIS_transform, "S1": S1_transform, "S2": S2_transform}
+
     train_image_paths, val_image_paths, test_image_paths = get_image_path()
 
-    train_images = SatelliteImageDataset(train_image_paths)
-    val_images = SatelliteImageDataset(val_image_paths)
-    test_images = SatelliteImageDataset(test_image_paths)
-    print(len(train_images), len(val_images), len(test_images))
-    # sate_data[0]
+    train_dataset = SatelliteImageDataset(train_image_paths, transform=transforms)
+    val_dataset = SatelliteImageDataset(val_image_paths, transform=transforms)
+    test_dataset = SatelliteImageDataset(test_image_paths, transform=transforms)
+
+    return train_dataset, val_dataset, test_dataset
+
+
+def get_dataloader(batch_size, train_dataset, val_dataset, test_dataset):
+    train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True, drop_last=False)
+    val_dataloader = DataLoader(val_dataset, batch_size, shuffle=True, drop_last=False)
+    test_dataloader = DataLoader(test_dataset, batch_size, shuffle=True, drop_last=False)
+
+    return train_dataloader, val_dataloader, test_dataloader
+
+
+if __name__ == '__main__':
+    train_dataset, val_dataset, test_dataset = get_dataset()

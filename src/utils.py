@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
+import torch
 
 
 # 从.txt获取训练集、验证集和测试集的数据编号
@@ -53,6 +54,15 @@ def calc_statistics(image_paths):
     return min_val, max_val, mean, std
 
 
+def generated_S2_to_rgb(generated_S2_image, device):
+    rgb = generated_S2_image[:, :3, :, :]
+    rgb = torch.index_select(rgb, 1, torch.tensor([2, 1, 0], dtype=torch.int64).to(device))
+    rgb = rgb * 850.08 + 1599.95
+    rgb = torch.clip(rgb, 0, 10000)
+    rgb = (rgb - torch.min(rgb)) / (torch.max(rgb) - torch.min(rgb))
+    return rgb
+
+
 def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
     loss_dict = np.load(loss_npy, allow_pickle=True).item()
     plt.figure(dpi=300, figsize=(12, 8))
@@ -64,8 +74,8 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
         plt.xlabel(x_label)
         plt.ylabel("loss")
         plt.plot(len_range, loss_value, label=loss_key, c="r")
-        plt.gca().xaxis.set_major_locator(ticker.MultipleLocator((len_range[-1]-len_range[0]) // 10))
-        plt.gca().yaxis.set_major_locator(ticker.MultipleLocator((y_max_value-y_min_value) / 10))
+        plt.gca().xaxis.set_major_locator(ticker.MultipleLocator((len_range[-1] - len_range[0]) // 10))
+        plt.gca().yaxis.set_major_locator(ticker.MultipleLocator((y_max_value - y_min_value) / 10))
         plt.grid()
         plt.legend()
         plt.savefig(loss_pic_dir + loss_key + ".png")
@@ -76,4 +86,5 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
 if __name__ == '__main__':
     # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\train_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
 
-    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\val_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
+    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\val_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\",
+              x_label="epoch")
