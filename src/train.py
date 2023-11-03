@@ -99,7 +99,7 @@ for epoch in range(epochs):
 
         if step % 10 == 0:
             end_time = time.time()
-            print("训练次数：{}，g_loss：{}，d_loss：{}，train_L2_loss：{} {}s".format(
+            print("step：{}，g_loss：{}，d_loss：{}，train_L2_loss：{} {}s".format(
                 step, g_loss.item(), d_loss.item(), L2_loss.item(), round(end_time - start_time, 2)))
 
             with torch.no_grad():

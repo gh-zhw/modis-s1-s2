@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 
 
@@ -57,11 +58,15 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
     plt.figure(dpi=300, figsize=(12, 8))
     for i, loss_key in enumerate(loss_dict.keys()):
         loss_value = loss_dict[loss_key]
-        value_len_range = np.arange(len(loss_value))
-        plt.xticks(value_len_range, value_len_range * xtick_gain, rotation=45)
+        y_min_value = min(loss_value)
+        y_max_value = max(loss_value)
+        len_range = np.arange(len(loss_value))
         plt.xlabel(x_label)
         plt.ylabel("loss")
-        plt.plot(value_len_range, loss_value, label=loss_key, c="r")
+        plt.plot(len_range, loss_value, label=loss_key, c="r")
+        plt.gca().xaxis.set_major_locator(ticker.MultipleLocator((len_range[-1]-len_range[0]) // 10))
+        plt.gca().yaxis.set_major_locator(ticker.MultipleLocator((y_max_value-y_min_value) / 10))
+        plt.grid()
         plt.legend()
         plt.savefig(loss_pic_dir + loss_key + ".png")
         # 清空绘图
