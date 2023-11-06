@@ -86,7 +86,7 @@ for epoch in range(epochs):
         with torch.no_grad():
             generated_S2_image = generator(MODIS_image, S1_image)
             if flag:
-                rgb = generated_S2_to_rgb(generated_S2_image[:4], device)
+                rgb = generated_S2_to_rgb(generated_S2_image[:4])
                 writer.add_images("generated_images", rgb, epoch)
                 flag = False
 

@@ -38,13 +38,17 @@ S1_std = [3.64, 3.69]
 S2_mean = [934.77, 1133.94, 1127.39, 1467.05617328, 2378.66, 2400.76, 1922.42, 1434.61]
 S2_std = [486.39, 491.88, 554.30, 526.60, 910.23, 906.85, 644.25, 610.28]
 
+
 def get_dataset():
     MODIS_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                                      torchvision.transforms.Normalize(mean=MODIS_mean, std=MODIS_std)])
+                                                      torchvision.transforms.Normalize(mean=MODIS_mean, std=MODIS_std)
+                                                      ])
     S1_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                                   torchvision.transforms.Normalize(mean=S1_mean, std=S1_std)])
+                                                   torchvision.transforms.Normalize(mean=S1_mean, std=S1_std)
+                                                   ])
     S2_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                                   torchvision.transforms.Normalize(mean=S2_mean, std=S2_std)])
+                                                   torchvision.transforms.Normalize(mean=S2_mean, std=S2_std)
+                                                   ])
     transforms = {"MODIS": MODIS_transform, "S1": S1_transform, "S2": S2_transform}
 
     train_image_paths, val_image_paths, test_image_paths = get_image_path()
@@ -66,3 +70,4 @@ def get_dataloader(batch_size, train_dataset, val_dataset, test_dataset):
 
 if __name__ == '__main__':
     train_dataset, val_dataset, test_dataset = get_dataset()
+    print(len(train_dataset[0]))

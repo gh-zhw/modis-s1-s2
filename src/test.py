@@ -7,7 +7,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 batch_size = 32
 train_dataloader, val_dataloader, test_dataloader = get_dataloader(batch_size, *get_dataset())
 dataloader = test_dataloader
-generator = torch.load(r"D:\Code\MODIS_S1_S2\model\pre_train_generator_epoch_200.pth")
+generator = torch.load(r"D:\Code\MODIS_S1_S2\model\pre_train_generator_epoch_300.pth")
 generator = generator.to(device)
 generator.eval()
 

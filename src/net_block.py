@@ -8,7 +8,7 @@ class ConvBlock(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
             nn.BatchNorm2d(out_channel),
-            nn.LeakyReLU(0.01, inplace=True),
+            nn.ReLU(inplace=True),
         )
 
     def forward(self, x):
@@ -22,7 +22,7 @@ class DeconvBlock(nn.Module):
         self.deconv = nn.Sequential(
             nn.ConvTranspose2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
             nn.BatchNorm2d(out_channel),
-            nn.LeakyReLU(0.01, inplace=True),
+            nn.ReLU(inplace=True),
         )
 
     def forward(self, x):

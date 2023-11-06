@@ -53,15 +53,15 @@ def calc_statistics(image_paths):
     return min_val, max_val, mean, std
 
 
-def generated_S2_to_rgb(generated_S2_image, device):
-    import torch
-    S2_mean = [934.77, 1133.94, 1127.39, 1467.05617328, 2378.66, 2400.76, 1922.42, 1434.61]
-    S2_std = [486.39, 491.88, 554.30, 526.60, 910.23, 906.85, 644.25, 610.28]
-    rgb = generated_S2_image[:, :3, :, :]
-    rgb = torch.index_select(rgb, 1, torch.tensor([2, 1, 0], dtype=torch.int64).to(device))
+def generated_S2_to_rgb(generated_S2_image):
+    S2_mean = np.array([934.77, 1133.94, 1127.39])[:, np.newaxis, np.newaxis]
+    S2_std = np.array([486.39, 491.88, 554.30])[:, np.newaxis, np.newaxis]
+    rgb = generated_S2_image[:, :3, :, :].cpu().numpy()
+    rgb = np.squeeze(rgb)
+    rgb = rgb[[2, 1, 0], :, :]
     rgb = rgb * S2_std + S2_mean
-    rgb = torch.clip(rgb, 0, 10000)
-    rgb = (rgb - torch.min(rgb)) / (torch.max(rgb) - torch.min(rgb))
+    rgb = np.clip(rgb, 0, 10000)
+    rgb = (rgb - np.min(rgb)) / (np.max(rgb) - np.min(rgb))
     return rgb
 
 
@@ -86,7 +86,7 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
 
 
 if __name__ == '__main__':
-    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_train_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
-    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
+    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_train_loss_300.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
+    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss_300.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
 
 
