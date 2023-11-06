@@ -4,11 +4,11 @@ import torch.nn as nn
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
-        super().__init__()
+        super(ConvBlock, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
             nn.BatchNorm2d(out_channel),
-            nn.LeakyReLU(0.1, inplace=True),
+            nn.LeakyReLU(0.01, inplace=True),
         )
 
     def forward(self, x):
@@ -18,11 +18,11 @@ class ConvBlock(nn.Module):
 
 class DeconvBlock(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
-        super().__init__()
+        super(DeconvBlock, self).__init__()
         self.deconv = nn.Sequential(
             nn.ConvTranspose2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
             nn.BatchNorm2d(out_channel),
-            nn.LeakyReLU(0.1, inplace=True),
+            nn.LeakyReLU(0.01, inplace=True),
         )
 
     def forward(self, x):
@@ -92,3 +92,4 @@ class DeconvChannelAttentionBlock(nn.Module):
 
 if __name__ == '__main__':
     pass
+
