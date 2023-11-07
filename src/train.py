@@ -4,7 +4,7 @@ from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from model import *
 from load_dataset import get_dataloader, get_dataset
-from utils import generated_S2_to_rgb
+from utils import generated_S2_to_rgb, gradient_penalty
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -17,18 +17,15 @@ discriminator = Discriminator()
 generator = generator.to(device)
 discriminator = discriminator.to(device)
 
-g_lr = 1e-3
-d_lr = 5e-4
+g_lr = 1e-4
+d_lr = 4e-4
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
 d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_lr)
-g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.8)
-d_scheduler = lr_scheduler.StepLR(d_optimizer, step_size=10, gamma=0.8)
+g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.9)
+d_scheduler = lr_scheduler.StepLR(d_optimizer, step_size=10, gamma=0.9)
 
 # tensorboard
-writer = SummaryWriter("../logs")
-
-loss_fn = nn.BCELoss()
-loss_fn = loss_fn.to(device)
+writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\wgan\\")
 
 train_loss = {"g_loss": [], "d_loss": [], "L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [],
               "L2_loss_band_3": [], "L2_loss_band_4": [], "L2_loss_band_5": [], "L2_loss_band_6": [],
@@ -36,6 +33,8 @@ train_loss = {"g_loss": [], "d_loss": [], "L2_loss": [], "L2_loss_band_1": [], "
 val_loss = {"L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [], "L2_loss_band_3": [],
             "L2_loss_band_4": [], "L2_loss_band_5": [], "L2_loss_band_6": [], "L2_loss_band_7": [],
             "L2_loss_band_8": []}
+
+LAMBDA_GP = 10
 
 epochs = 5
 step = 0
@@ -52,39 +51,37 @@ for epoch in range(epochs):
         S1_image = S1_image.to(device)
         real_S2_image = S2_image.to(device)
 
-        # 生成超分辨率图像
+        # generated fake image
         generated_S2_image = generator(MODIS_image, S1_image)
-
-        # 计算各波段的L2损失
-        L2_loss_bands = ((generated_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
-        L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
-        L2_loss = L2_loss_bands.mean()
 
         true_label = torch.ones((real_S2_image.shape[0], 1)).to(device)
         false_label = torch.zeros((real_S2_image.shape[0], 1)).to(device)
 
-        g_optimizer.zero_grad()
-        g_loss = loss_fn(discriminator(generated_S2_image), true_label)
-        g_total_loss = g_loss + L2_loss
-        g_total_loss.backward()
-        g_optimizer.step()
+        gp = gradient_penalty(discriminator, real_S2_image, generated_S2_image, device=device)
+        d_fake_loss = -torch.mean(discriminator(generated_S2_image.detach()))
+        d_real_loss = -torch.mean(discriminator(real_S2_image))
+        d_loss = d_fake_loss + d_real_loss + LAMBDA_GP * gp
+        d_optimizer.zero_grad()
+        d_loss.backward(retain_graph=True)
+        d_optimizer.step()
 
-        # 更新判别器参数
+        # update G
         if step % 3 == 0:
-            d_optimizer.zero_grad()
-            d_fake_loss = loss_fn(discriminator(generated_S2_image.detach()), false_label)
-            d_real_loss = loss_fn(discriminator(real_S2_image), true_label)
-            d_loss = d_fake_loss + d_real_loss
-            d_loss.backward()
-            d_optimizer.step()
+            # calculate L2_loss for bands
+            L2_loss_bands = ((generated_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
+            L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
+            L2_loss = L2_loss_bands.mean()
 
-        if step % 100 == 0:
+            g_optimizer.zero_grad()
+            g_loss = -torch.mean(discriminator(generated_S2_image))
+            g_total_loss = g_loss + L2_loss
+            g_total_loss.backward()
+            g_optimizer.step()
+
+        if step % 20 == 0:
             end_time = time.time()
             print("step：{}，g_loss：{}，d_loss：{}，train_L2_loss：{} {}s".format(
                 step, g_loss.item(), d_loss.item(), L2_loss.item(), round(end_time - start_time, 2)))
-
-            with torch.no_grad():
-                print(discriminator(generated_S2_image).mean().item(), discriminator(real_S2_image).mean().item())
 
             train_loss["g_loss"].append(g_loss.item())
             train_loss["d_loss"].append(d_loss.item())
@@ -117,7 +114,7 @@ for epoch in range(epochs):
         with torch.no_grad():
             generated_S2_image = generator(MODIS_image, S1_image)
             if flag:
-                rgb = generated_S2_to_rgb(generated_S2_image[:4], device)
+                rgb = generated_S2_to_rgb(generated_S2_image[:4])
                 writer.add_images("generated_images", rgb, epoch)
                 flag = False
 
@@ -142,8 +139,8 @@ writer.close()
 np.save(r"D:\Code\MODIS_S1_S2\output\loss\train_loss.npy", train_loss)
 np.save(r"D:\Code\MODIS_S1_S2\output\loss\val_loss.npy", val_loss)
 
-torch.save(generator, f"../model/GAN_generator_epoch_{epochs}.pth")
-torch.save(discriminator, f"../model/GAN_discriminator_epoch_{epochs}.pth")
+torch.save(generator, f"D:\Code\MODIS_S1_S2\model\GAN_generator_epoch_{epochs}.pth")
+torch.save(discriminator, f"D:\Code\MODIS_S1_S2\model\GAN_discriminator_epoch_{epochs}.pth")
 
 if __name__ == '__main__':
     pass

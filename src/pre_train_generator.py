@@ -8,7 +8,7 @@ from utils import generated_S2_to_rgb
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-batch_size = 8
+batch_size = 16
 
 train_dataloader, val_dataloader, _ = get_dataloader(batch_size, *get_dataset())
 
@@ -17,10 +17,10 @@ generator = generator.to(device)
 
 g_lr = 1e-3
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr, weight_decay=0.0001)
-g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.8)
+g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.9)
 
 # tensorboard
-writer = SummaryWriter("../logs")
+writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\\")
 
 train_loss = {"L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [],
               "L2_loss_band_3": [], "L2_loss_band_4": [], "L2_loss_band_5": [], "L2_loss_band_6": [],
@@ -29,7 +29,7 @@ val_loss = {"L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [], "L2_loss_
             "L2_loss_band_4": [], "L2_loss_band_5": [], "L2_loss_band_6": [], "L2_loss_band_7": [],
             "L2_loss_band_8": []}
 
-epochs = 5
+epochs = 100
 step = 0
 start_time = time.time()
 for epoch in range(epochs):
@@ -111,8 +111,7 @@ writer.close()
 np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_train_loss.npy", train_loss)
 np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss.npy", val_loss)
 
-torch.save(generator, f"../model/pre_train_generator_epoch_{epochs}.pth")
-
+torch.save(generator, f"D:\Code\MODIS_S1_S2\model\GAN_generator_epoch_{epochs}.pth")
 
 if __name__ == '__main__': 
     pass

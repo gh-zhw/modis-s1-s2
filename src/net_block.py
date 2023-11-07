@@ -7,7 +7,7 @@ class ConvBlock(nn.Module):
         super(ConvBlock, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
-            nn.BatchNorm2d(out_channel),
+            nn.InstanceNorm2d(out_channel),
             nn.ReLU(inplace=True),
         )
 
@@ -21,7 +21,7 @@ class DeconvBlock(nn.Module):
         super(DeconvBlock, self).__init__()
         self.deconv = nn.Sequential(
             nn.ConvTranspose2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
-            nn.BatchNorm2d(out_channel),
+            nn.InstanceNorm2d(out_channel),
             nn.ReLU(inplace=True),
         )
 
@@ -31,7 +31,7 @@ class DeconvBlock(nn.Module):
 
 
 class ChannelAttention(nn.Module):
-    def __init__(self, channel, reduction=8):
+    def __init__(self, channel, reduction=16):
         super().__init__()
         self.maxpool = nn.AdaptiveMaxPool2d(1)
         self.avgpool = nn.AdaptiveAvgPool2d(1)

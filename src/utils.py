@@ -3,6 +3,26 @@ import matplotlib.ticker as ticker
 import numpy as np
 
 
+def gradient_penalty(discriminator, real, fake, device):
+    import torch
+    BATCH_SIZE, C, H, W = real.shape
+    alpha = torch.randn(size=(BATCH_SIZE, 1, 1, 1)).repeat(1, C, H, W).to(device)
+    interpolated_images = real * alpha + fake * (1 - alpha)
+
+    mixed_scores = discriminator(interpolated_images)
+
+    gradient = torch.autograd.grad(
+        inputs=interpolated_images,
+        outputs=mixed_scores,
+        grad_outputs=torch.ones_like(mixed_scores),
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    gradient = gradient.view(gradient.shape[0], -1)
+    gradient_norm = gradient.norm(2, dim=1)
+    gradient_penality = torch.mean((gradient_norm - 1) ** 2)
+    return gradient_penality
+
 
 # 从.txt获取训练集、验证集和测试集的数据编号
 def get_data_index():
@@ -86,7 +106,6 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
 
 
 if __name__ == '__main__':
-    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_train_loss_300.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
+    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\通道标准化\pre_train_generator_train_loss_300.npy",
+              r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
     # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss_300.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
-
-

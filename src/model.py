@@ -87,7 +87,7 @@ class Discriminator(nn.Module):
             ConvBlock(in_channel=32, out_channel=16, kernel_size=2, stride=2, padding=0),
             nn.Flatten(),
             nn.Linear(1024, 1),
-            nn.Sigmoid()
+            # nn.Sigmoid()
         )
         self.model_weak = nn.Sequential(
             ConvBlock(in_channel=8, out_channel=4, kernel_size=3, stride=2, padding=1),
@@ -95,7 +95,7 @@ class Discriminator(nn.Module):
             ConvBlock(in_channel=2, out_channel=1, kernel_size=3, stride=2, padding=1),
             nn.Flatten(),
             nn.Linear(1024, 1),
-            nn.Sigmoid()
+            # nn.Sigmoid()
         )
 
     def forward(self, _input):
