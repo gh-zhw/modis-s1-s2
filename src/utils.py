@@ -106,6 +106,5 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
 
 
 if __name__ == '__main__':
-    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\通道标准化\pre_train_generator_train_loss_300.npy",
-              r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
-    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss_300.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
+    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_train_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
+    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_val_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")

@@ -52,7 +52,6 @@ def get_dataset():
     transforms = {"MODIS": MODIS_transform, "S1": S1_transform, "S2": S2_transform}
 
     train_image_paths, val_image_paths, test_image_paths = get_image_path()
-
     train_dataset = SatelliteImageDataset(train_image_paths, transform=transforms)
     val_dataset = SatelliteImageDataset(val_image_paths, transform=transforms)
     test_dataset = SatelliteImageDataset(test_image_paths, transform=transforms)

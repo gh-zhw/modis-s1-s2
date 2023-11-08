@@ -8,7 +8,7 @@ from utils import generated_S2_to_rgb
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-batch_size = 16
+batch_size = 8
 
 train_dataloader, val_dataloader, _ = get_dataloader(batch_size, *get_dataset())
 
@@ -17,7 +17,7 @@ generator = generator.to(device)
 
 g_lr = 1e-3
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr, weight_decay=0.0001)
-g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.9)
+g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.8)
 
 # tensorboard
 writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\\")
