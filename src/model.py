@@ -80,18 +80,23 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.model = nn.Sequential(
-            nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=2),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=2),
+            nn.InstanceNorm2d(64),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 32, kernel_size=2, stride=2, padding=0),
+            nn.Conv2d(64, 32, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm2d(32),
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 16, kernel_size=2, stride=2, padding=0),
+            nn.InstanceNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(16, 8, kernel_size=2, stride=2, padding=0),
+            nn.InstanceNorm2d(8),
             nn.ReLU(inplace=True),
             nn.Flatten(),
-            nn.Linear(1024, 1),
+            nn.Linear(512, 1),
             # nn.Sigmoid()
         )
 
@@ -113,6 +118,6 @@ class GAN(nn.Module):
 if __name__ == '__main__':
     g = Generator()
     d = Discriminator()
-    # summary(g.cuda(), [(6, 5, 5), (2, 250, 250)], 8)
-    summary(d.cuda(), (8, 250, 250), 8)
+    summary(g.cuda(), [(6, 5, 5), (2, 250, 250)], 32)
+    # summary(d.cuda(), (16, 250, 250), 8)
 

@@ -69,4 +69,5 @@ def get_dataloader(batch_size, train_dataset, val_dataset, test_dataset):
 
 if __name__ == '__main__':
     train_dataset, val_dataset, test_dataset = get_dataset()
-    print(len(train_dataset[0]))
+    train_dataloader, val_dataloader, _ = get_dataloader(8, *get_dataset())
+    print(len(train_dataloader))

@@ -31,6 +31,7 @@ val_loss = {"L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [], "L2_loss_
 
 epochs = 100
 step = 0
+total_step = epochs * len(train_dataloader)
 start_time = time.time()
 for epoch in range(epochs):
     print("=" * 30 + f" epoch {epoch + 1} " + "=" * 30)
@@ -44,10 +45,10 @@ for epoch in range(epochs):
         S1_image = S1_image.to(device)
         real_S2_image = S2_image.to(device)
 
-        # 生成超分辨率图像
+        # generated fake image
         generated_S2_image = generator(MODIS_image, S1_image)
 
-        # 计算各波段的L2损失
+        # calculate L2_loss for bands
         L2_loss_bands = ((generated_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
         L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
         L2_loss = L2_loss_bands.mean()
@@ -58,8 +59,8 @@ for epoch in range(epochs):
 
         if step % 10 == 0:
             end_time = time.time()
-            print("step：{}, train_L2_loss：{} {}s".format(
-                step, L2_loss.item(), round(end_time - start_time, 2)))
+            print("[step {}/{}] train_L2_loss = {}  {}s".format(
+                step, total_step, L2_loss.item(), round(end_time - start_time, 2)))
 
             train_loss["L2_loss"].append(L2_loss.item())
             for band in range(L2_loss_bands.shape[0]):

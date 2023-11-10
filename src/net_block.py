@@ -6,11 +6,10 @@ class ConvBlock(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
         super(ConvBlock, self).__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channel, (in_channel + out_channel) // 2, kernel_size, stride, padding, bias=bias),
-            nn.InstanceNorm2d((in_channel + out_channel) // 2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d((in_channel + out_channel) // 2, out_channel, 1, 1, 0, bias=bias),
+            nn.Conv2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
             nn.InstanceNorm2d(out_channel),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=bias),
         )
 
     def forward(self, x):
@@ -22,11 +21,10 @@ class DeconvBlock(nn.Module):
     def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
         super(DeconvBlock, self).__init__()
         self.deconv = nn.Sequential(
-            nn.ConvTranspose2d(in_channel, (in_channel + out_channel) // 2, kernel_size, stride, padding, bias=bias),
-            nn.InstanceNorm2d((in_channel + out_channel) // 2),
-            nn.ReLU(inplace=True),
-            nn.ConvTranspose2d((in_channel + out_channel) // 2, out_channel, 1, 1, 0, bias=bias),
+            nn.ConvTranspose2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
             nn.InstanceNorm2d(out_channel),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(out_channel, out_channel, 1, 1, 0, bias=bias),
         )
 
     def forward(self, x):

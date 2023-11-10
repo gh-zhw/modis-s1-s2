@@ -1,27 +1,21 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
+import torch
+from skimage.metrics import structural_similarity
 
 
-def gradient_penalty(discriminator, real, fake, device):
-    import torch
-    BATCH_SIZE, C, H, W = real.shape
-    alpha = torch.randn(size=(BATCH_SIZE, 1, 1, 1)).repeat(1, C, H, W).to(device)
-    interpolated_images = real * alpha + fake * (1 - alpha)
+def calc_statistics(image_paths):
+    images = []
+    for image_path in image_paths:
+        images.append(np.load(image_path))
 
-    mixed_scores = discriminator(interpolated_images)
+    min_val = np.min(images, axis=(0, 2, 3))
+    max_val = np.max(images, axis=(0, 2, 3))
+    mean = np.mean(images, axis=(0, 2, 3))
+    std = np.std(images, axis=(0, 2, 3))
 
-    gradient = torch.autograd.grad(
-        inputs=interpolated_images,
-        outputs=mixed_scores,
-        grad_outputs=torch.ones_like(mixed_scores),
-        create_graph=True,
-        retain_graph=True
-    )[0]
-    gradient = gradient.view(gradient.shape[0], -1)
-    gradient_norm = gradient.norm(2, dim=1)
-    gradient_penality = torch.mean((gradient_norm - 1) ** 2)
-    return gradient_penality
+    return min_val, max_val, mean, std
 
 
 # 从.txt获取训练集、验证集和测试集的数据编号
@@ -60,17 +54,24 @@ def get_image_path():
     return train_image_paths, val_image_paths, test_image_paths
 
 
-def calc_statistics(image_paths):
-    images = []
-    for image_path in image_paths:
-        images.append(np.load(image_path))
+def gradient_penalty(critic, real, fake, device='cpu'):
+    BATCH_SIZE, C, H, W = real.shape
+    alpha = torch.randn(size=(BATCH_SIZE, 1, 1, 1)).repeat(1, C, H, W).to(device)
+    interpolated_images = real * alpha + fake * (1 - alpha)
 
-    min_val = np.min(images, axis=(0, 2, 3))
-    max_val = np.max(images, axis=(0, 2, 3))
-    mean = np.mean(images, axis=(0, 2, 3))
-    std = np.std(images, axis=(0, 2, 3))
+    mixed_scores = critic(interpolated_images)
 
-    return min_val, max_val, mean, std
+    gradient = torch.autograd.grad(
+        inputs=interpolated_images,
+        outputs=mixed_scores,
+        grad_outputs=torch.ones_like(mixed_scores),
+        create_graph=True,
+        retain_graph=True
+    )[0]
+    gradient = gradient.view(gradient.shape[0], -1)
+    gradient_norm = gradient.norm(2, dim=1)
+    gradient_penalty = torch.mean((gradient_norm - 1) ** 2)
+    return gradient_penalty
 
 
 def generated_S2_to_rgb(generated_S2_image):
@@ -83,6 +84,42 @@ def generated_S2_to_rgb(generated_S2_image):
     rgb = np.clip(rgb, 0, 10000)
     rgb = (rgb - np.min(rgb)) / (np.max(rgb) - np.min(rgb))
     return rgb
+
+
+def calc_metric(prediction, target, max_value, data_range, output="bands"):
+    prediction = np.array(prediction)
+    target = np.array(target)
+
+    band_num = prediction.shape[1]
+    mae_bands = np.zeros(band_num)
+    rmse_bands = np.zeros(band_num)
+    psnr_bands = np.zeros(band_num)
+    ssim_bands = np.zeros(band_num)
+
+    for i in range(band_num):
+        target_band = np.squeeze(target[:, i, :, :])
+        prediction_band = np.squeeze(prediction[:, i, :, :])
+
+        # calculate MAE
+        mae = np.abs(target_band - prediction_band).mean()
+        mae_bands[i] = mae
+
+        # calculate RMSE
+        rmse = np.sqrt(((target_band - prediction_band) ** 2).mean())
+        rmse_bands[i] = rmse
+
+        # calculate PSNR
+        psnr = 20 * np.log10(max_value / rmse)
+        psnr_bands[i] = psnr
+
+        # calculate SSIM
+        ssim = structural_similarity(target_band, prediction_band, data_range=data_range)
+        ssim_bands[i] = ssim
+
+    if output == "bands":
+        return mae_bands, rmse_bands, psnr_bands, ssim_bands
+    elif output == "mean":
+        return mae_bands.mean(), rmse_bands.mean(), psnr_bands.mean(), ssim_bands.mean()
 
 
 def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
@@ -106,5 +143,7 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
 
 
 if __name__ == '__main__':
-    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_train_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
-    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_val_loss.npy", r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
+    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_train_loss.npy",
+              r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
+    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_val_loss.npy",
+              r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
