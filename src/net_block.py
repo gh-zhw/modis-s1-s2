@@ -3,32 +3,40 @@ import torch.nn as nn
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
+    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, is_norm=True):
         super(ConvBlock, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
-            nn.InstanceNorm2d(out_channel),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=bias),
-        )
+
+        self.is_norm = is_norm
+        self.conv_1 = nn.Conv2d(in_channel, out_channel, kernel_size, stride, padding, bias=False)
+        self.norm = nn.BatchNorm2d(out_channel)
+        self.activation = nn.ReLU(inplace=True)
+        self.conv_2 = nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=False)
 
     def forward(self, x):
-        output = self.conv(x)
+        x = self.conv_1(x)
+        if self.is_norm:
+            x = self.norm(x)
+        x = self.activation(x)
+        output = self.conv_2(x)
         return output
 
 
 class DeconvBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
+    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, is_norm=True):
         super(DeconvBlock, self).__init__()
-        self.deconv = nn.Sequential(
-            nn.ConvTranspose2d(in_channel, out_channel, kernel_size, stride, padding, bias=bias),
-            nn.InstanceNorm2d(out_channel),
-            nn.ReLU(inplace=True),
-            nn.ConvTranspose2d(out_channel, out_channel, 1, 1, 0, bias=bias),
-        )
+
+        self.is_norm = is_norm
+        self.deconv = nn.ConvTranspose2d(in_channel, out_channel, kernel_size, stride, padding, bias=False)
+        self.norm = nn.BatchNorm2d(out_channel)
+        self.activation = nn.ReLU(inplace=True)
+        self.conv = nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=False)
 
     def forward(self, x):
-        output = self.deconv(x)
+        x = self.deconv(x)
+        if self.is_norm:
+            x = self.norm(x)
+        x = self.activation(x)
+        output = self.conv(x)
         return output
 
 
@@ -78,11 +86,11 @@ class CBAM(nn.Module):
 
 
 class ConvCBAMBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
+    def __init__(self, in_channel, out_channel, kernel_size, stride, padding):
         super().__init__()
-        self.conv = ConvBlock(in_channel, out_channel, kernel_size, stride, padding, bias=bias)
+        self.conv = ConvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=True)
         self.CBAM = CBAM(out_channel)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.conv(x)
@@ -92,11 +100,11 @@ class ConvCBAMBlock(nn.Module):
 
 
 class DeconvCBAMBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, bias=False):
+    def __init__(self, in_channel, out_channel, kernel_size, stride, padding):
         super().__init__()
-        self.deconv = DeconvBlock(in_channel, out_channel, kernel_size, stride, padding, bias=bias)
+        self.deconv = DeconvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=True)
         self.CBAM = CBAM(out_channel)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.deconv(x)

@@ -5,11 +5,11 @@ from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from model import *
 from load_dataset import get_dataloader, get_dataset
-from utils import generated_S2_to_rgb, gradient_penalty
+from utils import generated_S2_to_rgb, gradient_penalty, L1_Loss_for_bands, L2_Loss_for_bands
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-batch_size = 4
+batch_size = 16
 
 train_dataloader, val_dataloader, _ = get_dataloader(batch_size, *get_dataset())
 
@@ -18,8 +18,8 @@ discriminator = Discriminator()
 generator = generator.to(device)
 discriminator = discriminator.to(device)
 
-g_lr = 1e-4
-d_lr = 4e-4
+g_lr = 5e-5
+d_lr = 5e-5
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
 d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_lr)
 g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.9)
@@ -28,12 +28,12 @@ d_scheduler = lr_scheduler.StepLR(d_optimizer, step_size=10, gamma=0.9)
 # tensorboard
 writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\wgan\\")
 
-train_loss = {"g_loss": [], "d_loss": [], "W_dis": [], "L2_loss": [], "L2_loss_band_1": [],
-              "L2_loss_band_2": [], "L2_loss_band_3": [], "L2_loss_band_4": [], "L2_loss_band_5": [],
-              "L2_loss_band_6": [], "L2_loss_band_7": [], "L2_loss_band_8": []}
-val_loss = {"L2_loss": [], "L2_loss_band_1": [], "L2_loss_band_2": [], "L2_loss_band_3": [],
-            "L2_loss_band_4": [], "L2_loss_band_5": [], "L2_loss_band_6": [], "L2_loss_band_7": [],
-            "L2_loss_band_8": []}
+train_loss = {"g_loss": [], "d_loss": [], "W_dis": [], "L_loss": [], "L_loss_band_1": [],
+              "L_loss_band_2": [], "L_loss_band_3": [], "L_loss_band_4": [], "L_loss_band_5": [],
+              "L_loss_band_6": [], "L_loss_band_7": [], "L_loss_band_8": []}
+val_loss = {"L_loss": [], "L_loss_band_1": [], "L_loss_band_2": [], "L_loss_band_3": [],
+            "L_loss_band_4": [], "L_loss_band_5": [], "L_loss_band_6": [], "L_loss_band_7": [],
+            "L_loss_band_8": []}
 
 LAMBDA_GP = 10
 
@@ -75,35 +75,38 @@ for epoch in range(epochs):
         # update G
         if step % 5 == 0:
             # calculate L2_loss for bands
-            L2_loss_bands = ((generated_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
-            L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
-            L2_loss = L2_loss_bands.mean()
+            L_loss_bands = L2_Loss_for_bands(generated_S2_image, real_S2_image)
+            L_loss = L_loss_bands.mean()
+
+            # calculate L1_loss for bands
+            # L_loss_bands = L1_Loss_for_bands(generated_S2_image, real_S2_image)
+            # L_loss = L_loss_bands.mean()
 
             g_optimizer.zero_grad()
             g_loss = -torch.mean(discriminator(d_fake_input))
-            g_total_loss = g_loss + L2_loss
+            g_total_loss = g_loss + L_loss
             g_loss.backward()
             g_optimizer.step()
 
         if step % 20 == 0:
             end_time = time.time()
-            print("[step {}/{}] g_loss = {} | d_loss = {} | W_dis = {} | train_L2_loss = {}  {}s".format(
-                step, total_step, g_loss.item(), d_loss.item(), wasserstein_distance.item(), L2_loss.item(),
+            print("[step {}/{}] g_loss = {} | d_loss = {} | W_dis = {} | train_L_loss = {}  {}s".format(
+                step, total_step, g_loss.item(), d_loss.item(), wasserstein_distance.item(), L_loss.item(),
                 round(end_time - start_time, 2)))
 
             train_loss["g_loss"].append(g_loss.item())
             train_loss["d_loss"].append(d_loss.item())
             train_loss["W_dis"].append(wasserstein_distance.item())
-            train_loss["L2_loss"].append(L2_loss.item())
-            for band in range(L2_loss_bands.shape[0]):
-                train_loss[f"L2_loss_band_{band + 1}"].append(L2_loss_bands[band].item())
+            train_loss["L_loss"].append(L_loss.item())
+            for band in range(L_loss_bands.shape[0]):
+                train_loss[f"L_loss_band_{band + 1}"].append(L_loss_bands[band].item())
 
             writer.add_scalar("g_loss", g_loss, step)
             writer.add_scalar("d_loss", d_loss, step)
             writer.add_scalar("W_dis", wasserstein_distance, step)
-            writer.add_scalar("train_L2_loss", L2_loss, step)
-            # for band in range(L2_loss_bands.shape[0]):
-            #     writer.add_scalar("train_L2_loss_band_" + str(band + 1), L2_loss_bands[band].item(), step)
+            writer.add_scalar("train_L_loss", L_loss, step)
+            # for band in range(L_loss_bands.shape[0]):
+            #     writer.add_scalar("train_L_loss_band_" + str(band + 1), L_loss_bands[band].item(), step)
 
         step += 1
 
@@ -114,7 +117,7 @@ for epoch in range(epochs):
     generator.eval()
     discriminator.eval()
     flag = True
-    val_L2_loss_bands = torch.zeros(8).to(device)
+    val_L_loss_bands = torch.zeros(8).to(device)
     for mini_batch in val_dataloader:
         MODIS_image, S1_image, S2_image = mini_batch
         MODIS_image = MODIS_image.to(device)
@@ -128,21 +131,27 @@ for epoch in range(epochs):
                 writer.add_images("generated_images", rgb, epoch)
                 flag = False
 
-        L2_loss_bands = ((generated_S2_image - real_S2_image) ** 2).sum(dim=(0, 2, 3))
-        L2_loss_bands /= (real_S2_image.shape[0] * real_S2_image.shape[2] * real_S2_image.shape[3])
-        val_L2_loss_bands += L2_loss_bands
+        # calculate L2_loss for bands
+        L_loss_bands = L2_Loss_for_bands(generated_S2_image, real_S2_image)
+        L_loss_value = L_loss_bands.mean()
 
-    val_L2_loss_bands /= len(val_dataloader)
-    val_L2_loss = val_L2_loss_bands.mean()
-    print(f"val_L2_loss：{val_L2_loss}")
+        # calculate L1_loss for bands
+        # L_loss_bands = L1_Loss_for_bands(generated_S2_image, real_S2_image)
+        # L_loss = L_loss_bands.mean()
+        
+        val_L_loss_bands += L_loss_bands
 
-    val_loss["L2_loss"].append(val_L2_loss.item())
-    for band in range(val_L2_loss_bands.shape[0]):
-        val_loss[f"L2_loss_band_{band + 1}"].append(val_L2_loss_bands[band].item())
+    val_L_loss_bands /= len(val_dataloader)
+    val_L_loss = val_L_loss_bands.mean()
+    print(f"val_L_loss：{val_L_loss}")
 
-    writer.add_scalar("val_L2_loss", val_L2_loss, epoch)
-    # for band in range(L2_loss_bands.shape[0]):
-    #     writer.add_scalar("val_L2_loss_band_" + str(band + 1), val_L2_loss_bands[band].item(), epoch)
+    val_loss["L_loss"].append(val_L_loss.item())
+    for band in range(val_L_loss_bands.shape[0]):
+        val_loss[f"L_loss_band_{band + 1}"].append(val_L_loss_bands[band].item())
+
+    writer.add_scalar("val_L_loss", val_L_loss, epoch)
+    # for band in range(L_loss_bands.shape[0]):
+    #     writer.add_scalar("val_L_loss_band_" + str(band + 1), val_L_loss_bands[band].item(), epoch)
 
 writer.close()
 

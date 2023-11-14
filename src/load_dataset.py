@@ -31,12 +31,12 @@ class SatelliteImageDataset(Dataset):
         return MODIS_image, S1_image, S2_image
 
 
-MODIS_mean = [956.77, 2256.87, 684.35, 951.04, 1783.60, 1115.68]
-MODIS_std = [464.25, 592.44, 471.64, 440.68, 500.87, 450.20]
-S1_mean = [-8.70, -16.90]
-S1_std = [3.64, 3.69]
-S2_mean = [934.77, 1133.94, 1127.39, 1467.05617328, 2378.66, 2400.76, 1922.42, 1434.61]
-S2_std = [486.39, 491.88, 554.30, 526.60, 910.23, 906.85, 644.25, 610.28]
+MODIS_mean = [860.09, 2476.90, 582.36, 887.42, 1735.93, 1034.36]
+MODIS_std = [396.47, 671.66, 394.35, 377.75, 455.38, 364.76]
+S1_mean = [-9.63, -16.76]
+S1_std = [4.04, 4.28]
+S2_mean = [978.63, 1200.54, 1157.47, 1548.37, 2613.08, 2679.21, 2024.73, 1522.61]
+S2_std = [576.95, 588.16, 634.96, 635.60, 1116.86, 1132.45, 822.61, 753.66]
 
 
 def get_dataset():
@@ -69,5 +69,4 @@ def get_dataloader(batch_size, train_dataset, val_dataset, test_dataset):
 
 if __name__ == '__main__':
     train_dataset, val_dataset, test_dataset = get_dataset()
-    train_dataloader, val_dataloader, _ = get_dataloader(8, *get_dataset())
-    print(len(train_dataloader))
+    print(len(train_dataset), len(val_dataset), len(test_dataset))

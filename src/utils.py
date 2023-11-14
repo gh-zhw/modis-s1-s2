@@ -38,18 +38,22 @@ def get_data_index():
 
 
 def get_image_path():
-    MODIS_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\MODIS\\MODIS_"
-    S1_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\S1\\S1_"
-    S2_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\S2\\S2_"
+    train_MODIS_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\train\MODIS\MODIS_"
+    train_S1_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\train\S1\S1_"
+    train_S2_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\train\S2\S2_"
+
+    test_MODIS_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\test\MODIS\MODIS_"
+    test_S1_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\test\S1\S1_"
+    test_S2_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\test\S2\S2_"
 
     train_data_index, val_data_index, test_data_index = get_data_index()
     train_image_paths, val_image_paths, test_image_paths = [], [], []
     for index in train_data_index:
-        train_image_paths.append([MODIS_dir + index + ".npy", S1_dir + index + ".npy", S2_dir + index + ".npy"])
+        train_image_paths.append([train_MODIS_dir + index + ".npy", train_S1_dir + index + ".npy", train_S2_dir + index + ".npy"])
     for index in val_data_index:
-        val_image_paths.append([MODIS_dir + index + ".npy", S1_dir + index + ".npy", S2_dir + index + ".npy"])
+        val_image_paths.append([train_MODIS_dir + index + ".npy", train_S1_dir + index + ".npy", train_S2_dir + index + ".npy"])
     for index in test_data_index:
-        test_image_paths.append([MODIS_dir + index + ".npy", S1_dir + index + ".npy", S2_dir + index + ".npy"])
+        test_image_paths.append([test_MODIS_dir + index + ".npy", test_S1_dir + index + ".npy", test_S2_dir + index + ".npy"])
 
     return train_image_paths, val_image_paths, test_image_paths
 
@@ -75,15 +79,27 @@ def gradient_penalty(critic, real, fake, device='cpu'):
 
 
 def generated_S2_to_rgb(generated_S2_image):
-    S2_mean = np.array([934.77, 1133.94, 1127.39])[:, np.newaxis, np.newaxis]
-    S2_std = np.array([486.39, 491.88, 554.30])[:, np.newaxis, np.newaxis]
+    S2_mean = np.array([978.63, 1200.54, 1157.47])[:, np.newaxis, np.newaxis]
+    S2_std = np.array([576.95, 588.16, 634.96])[:, np.newaxis, np.newaxis]
     rgb = generated_S2_image[:, :3, :, :].cpu().numpy()
     rgb = np.squeeze(rgb)
-    rgb = rgb[[2, 1, 0], :, :]
+    rgb = rgb[:, [2, 1, 0], :, :]
     rgb = rgb * S2_std + S2_mean
     rgb = np.clip(rgb, 0, 10000)
     rgb = (rgb - np.min(rgb)) / (np.max(rgb) - np.min(rgb))
     return rgb
+
+
+def L2_Loss_for_bands(prediction, target):
+    L2_loss_bands = ((prediction - target) ** 2).sum(dim=(0, 2, 3))
+    L2_loss_bands /= (target.shape[0] * target.shape[2] * target.shape[3])
+    return L2_loss_bands
+
+
+def L1_Loss_for_bands(prediction, target):
+    L1_loss_bands = torch.abs((prediction - target)).sum(dim=(0, 2, 3))
+    L1_loss_bands /= (target.shape[0] * target.shape[2] * target.shape[3])
+    return L1_loss_bands
 
 
 def calc_metric(prediction, target, max_value, data_range, output="bands"):
