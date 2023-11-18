@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
-
 from torchsummary import summary
-from net_block import ConvCBAMBlock, DeconvCBAMBlock
+from net_block import ConvCBAMBlock, DeconvCBAMBlock, ConvBlock, UpsampleCBAMBlock
 
 
 class Generator(nn.Module):
@@ -22,6 +21,13 @@ class Generator(nn.Module):
         self.deconv_cbam_block_5 = DeconvCBAMBlock(72, 48, kernel_size=3, stride=2, padding=2)
         self.deconv_cbam_block_6 = DeconvCBAMBlock(52, 32, kernel_size=2, stride=2, padding=0)
 
+        # self.upsample_cbam_block_1 = UpsampleCBAMBlock(134, 128, out_size=8)
+        # self.upsample_cbam_block_2 = UpsampleCBAMBlock(192, 96, out_size=16)
+        # self.upsample_cbam_block_3 = UpsampleCBAMBlock(128, 96, out_size=32)
+        # self.upsample_cbam_block_4 = UpsampleCBAMBlock(112, 64, out_size=64)
+        # self.upsample_cbam_block_5 = UpsampleCBAMBlock(72, 48, out_size=125)
+        # self.upsample_cbam_block_6 = UpsampleCBAMBlock(52, 32, out_size=250)
+
         self.res_block_1 = nn.Conv2d(2, 4, kernel_size=3, stride=2, padding=1)
         self.res_block_2 = nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1)
         self.res_block_3 = nn.Conv2d(32, 64, kernel_size=2, stride=2, padding=0)
@@ -29,14 +35,22 @@ class Generator(nn.Module):
         self.res_block_5 = nn.ConvTranspose2d(96, 64, kernel_size=2, stride=2, padding=0)
         self.res_block_6 = nn.ConvTranspose2d(48, 32, kernel_size=2, stride=2, padding=0)
 
-        self.conv_block = nn.Sequential(
+        self.conv_block_1 = nn.Sequential(
+            ConvBlock(in_channel=6, out_channel=6, kernel_size=3, stride=1, padding=1),
+            ConvBlock(in_channel=6, out_channel=6, kernel_size=3, stride=1, padding=1),
+            ConvBlock(in_channel=6, out_channel=6, kernel_size=3, stride=1, padding=1)
+        )
+
+        self.conv_block_2 = nn.Sequential(
             ConvCBAMBlock(in_channel=32, out_channel=16, kernel_size=3, stride=1, padding=1),
             ConvCBAMBlock(in_channel=16, out_channel=16, kernel_size=3, stride=1, padding=1),
             ConvCBAMBlock(in_channel=16, out_channel=8, kernel_size=3, stride=1, padding=1),
-            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=1, stride=1, padding=0),
-            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=1, stride=1, padding=0),
-            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=1, stride=1, padding=0),
+            ConvBlock(in_channel=8, out_channel=8, kernel_size=1, stride=1, padding=0, is_norm=False),
+            ConvBlock(in_channel=8, out_channel=8, kernel_size=1, stride=1, padding=0, is_norm=False),
+            ConvBlock(in_channel=8, out_channel=8, kernel_size=1, stride=1, padding=0, is_norm=False),
         )
+
+        self.tanh = nn.Tanh()
 
     def forward(self, MODIS_input, S1_input):
         # (2, 250, 250)
@@ -54,7 +68,8 @@ class Generator(nn.Module):
         # (128, 5, 5)
 
         # (6, 5, 5)
-        MODIS_size_8 = self.deconv_cbam_block_1(torch.cat((MODIS_input, S1_size_5), dim=1))
+        MODIS_size_5 = self.conv_block_1(MODIS_input)
+        MODIS_size_8 = self.deconv_cbam_block_1(torch.cat((MODIS_size_5, S1_size_5), dim=1))
         # (128, 8, 8)
         MODIS_size_16 = self.deconv_cbam_block_2(torch.cat((MODIS_size_8, S1_size_8), dim=1))
         # (96, 16, 16)
@@ -70,8 +85,28 @@ class Generator(nn.Module):
         MODIS_size_250 = MODIS_size_250 + self.res_block_6(MODIS_size_125)
         # (32, 250, 250)
 
-        S2_output = self.conv_block(MODIS_size_250)
+        # # (6, 5, 5)
+        # MODIS_size_5 = self.conv_block_1(MODIS_input)
+        # MODIS_size_8 = self.upsample_cbam_block_1(torch.cat((MODIS_size_5, S1_size_5), dim=1))
+        # # (128, 8, 8)
+        # MODIS_size_16 = self.upsample_cbam_block_2(torch.cat((MODIS_size_8, S1_size_8), dim=1))
+        # # (96, 16, 16)
+        # MODIS_size_16 = MODIS_size_16 + self.res_block_4(MODIS_size_8)
+        # MODIS_size_32 = self.upsample_cbam_block_3(torch.cat((MODIS_size_16, S1_size_16), dim=1))
+        # # (96, 32, 32)
+        # MODIS_size_64 = self.upsample_cbam_block_4(torch.cat((MODIS_size_32, S1_size_32), dim=1))
+        # # (64, 64, 64)
+        # MODIS_size_64 = MODIS_size_64 + self.res_block_5(MODIS_size_32)
+        # MODIS_size_125 = self.upsample_cbam_block_5(torch.cat((MODIS_size_64, S1_size_64), dim=1))
+        # # (48, 125, 125)
+        # MODIS_size_250 = self.upsample_cbam_block_6(torch.cat((MODIS_size_125, S1_size_125), dim=1))
+        # MODIS_size_250 = MODIS_size_250 + self.res_block_6(MODIS_size_125)
+        # # (32, 250, 250)
+
+        S2_output = self.conv_block_2(MODIS_size_250)
         # (8, 250, 250)
+
+        S2_output = self.tanh(S2_output)
 
         return S2_output
 

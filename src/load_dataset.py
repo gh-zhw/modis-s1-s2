@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 import torchvision
 from torch.utils.data import Dataset, DataLoader
 from utils import get_image_path
@@ -31,23 +30,21 @@ class SatelliteImageDataset(Dataset):
         return MODIS_image, S1_image, S2_image
 
 
-MODIS_mean = [860.09, 2476.90, 582.36, 887.42, 1735.93, 1034.36]
-MODIS_std = [396.47, 671.66, 394.35, 377.75, 455.38, 364.76]
-S1_mean = [-9.63, -16.76]
-S1_std = [4.04, 4.28]
-S2_mean = [978.63, 1200.54, 1157.47, 1548.37, 2613.08, 2679.21, 2024.73, 1522.61]
-S2_std = [576.95, 588.16, 634.96, 635.60, 1116.86, 1132.45, 822.61, 753.66]
-
-
 def get_dataset():
     MODIS_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                                      torchvision.transforms.Normalize(mean=MODIS_mean, std=MODIS_std)
+                                                      torchvision.transforms.Normalize(
+                                                          mean=[0.5]*6,
+                                                          std=[0.5]*6),
                                                       ])
     S1_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                                   torchvision.transforms.Normalize(mean=S1_mean, std=S1_std)
+                                                   torchvision.transforms.Normalize(
+                                                       mean=[0.5]*2,
+                                                       std=[0.5]*2),
                                                    ])
     S2_transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                                   torchvision.transforms.Normalize(mean=S2_mean, std=S2_std)
+                                                   torchvision.transforms.Normalize(
+                                                       mean=[0.5]*8,
+                                                       std=[0.5]*8),
                                                    ])
     transforms = {"MODIS": MODIS_transform, "S1": S1_transform, "S2": S2_transform}
 

@@ -40,6 +40,27 @@ class DeconvBlock(nn.Module):
         return output
 
 
+class UpsampleBlock(nn.Module):
+    def __init__(self, in_channel, out_channel, out_size, is_norm=True):
+        super(UpsampleBlock, self).__init__()
+
+        self.is_norm = is_norm
+        self.upsample = nn.Upsample(size=out_size, mode='nearest')
+        self.conv_1 = nn.Conv2d(in_channel, out_channel, 3, 1, 1, bias=False)
+        self.norm = nn.BatchNorm2d(out_channel)
+        self.activation = nn.ReLU(inplace=True)
+        self.conv_2 = nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=False)
+
+    def forward(self, x):
+        x = self.upsample(x)
+        x = self.conv_1(x)
+        if self.is_norm:
+            x = self.norm(x)
+        x = self.activation(x)
+        output = self.conv_2(x)
+        return output
+
+
 class ChannelAttention(nn.Module):
     def __init__(self, channel, ratio=16):
         super(ChannelAttention, self).__init__()
@@ -86,9 +107,9 @@ class CBAM(nn.Module):
 
 
 class ConvCBAMBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, kernel_size, stride, padding):
+    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, is_norm=True):
         super().__init__()
-        self.conv = ConvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=True)
+        self.conv = ConvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=is_norm)
         self.CBAM = CBAM(out_channel)
         self.relu = nn.ReLU(inplace=True)
 
@@ -100,14 +121,28 @@ class ConvCBAMBlock(nn.Module):
 
 
 class DeconvCBAMBlock(nn.Module):
-    def __init__(self, in_channel, out_channel, kernel_size, stride, padding):
+    def __init__(self, in_channel, out_channel, kernel_size, stride, padding, is_norm=True):
         super().__init__()
-        self.deconv = DeconvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=True)
+        self.deconv = DeconvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=is_norm)
         self.CBAM = CBAM(out_channel)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.deconv(x)
+        x = self.CBAM(x)
+        output = self.relu(x)
+        return output
+
+
+class UpsampleCBAMBlock(nn.Module):
+    def __init__(self, in_channel, out_channel, out_size, is_norm=True):
+        super().__init__()
+        self.upsample = UpsampleBlock(in_channel, out_channel, out_size, is_norm=is_norm)
+        self.CBAM = CBAM(out_channel)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x = self.upsample(x)
         x = self.CBAM(x)
         output = self.relu(x)
         return output

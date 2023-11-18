@@ -18,12 +18,12 @@ discriminator = Discriminator()
 generator = generator.to(device)
 discriminator = discriminator.to(device)
 
-g_lr = 5e-5
-d_lr = 5e-5
+g_lr = 5e-4
+d_lr = 5e-4
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
 d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_lr)
-g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=10, gamma=0.9)
-d_scheduler = lr_scheduler.StepLR(d_optimizer, step_size=10, gamma=0.9)
+g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=50, gamma=0.5)
+d_scheduler = lr_scheduler.StepLR(d_optimizer, step_size=50, gamma=0.5)
 
 # tensorboard
 writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\wgan\\")
@@ -153,13 +153,16 @@ for epoch in range(epochs):
     # for band in range(L_loss_bands.shape[0]):
     #     writer.add_scalar("val_L_loss_band_" + str(band + 1), val_L_loss_bands[band].item(), epoch)
 
+    if ((epoch+1) % 50 == 0 and epoch > 0) or epoch == epochs-1:
+        torch.save(generator, f"D:\Code\MODIS_S1_S2\model\pre_train_generator_epoch_{epoch+1}.pth")
+        torch.save(discriminator, f"D:\Code\MODIS_S1_S2\model\GAN_discriminator_epoch_{epoch+1}.pth")
+
+
 writer.close()
 
 np.save(r"D:\Code\MODIS_S1_S2\output\loss\train_loss.npy", train_loss)
 np.save(r"D:\Code\MODIS_S1_S2\output\loss\val_loss.npy", val_loss)
 
-torch.save(generator, f"D:\Code\MODIS_S1_S2\model\GAN_generator_epoch_{epochs}.pth")
-torch.save(discriminator, f"D:\Code\MODIS_S1_S2\model\GAN_discriminator_epoch_{epochs}.pth")
 
 if __name__ == '__main__':
     pass

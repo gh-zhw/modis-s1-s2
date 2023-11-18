@@ -2,20 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import torch
-from skimage.metrics import structural_similarity
-
-
-def calc_statistics(image_paths):
-    images = []
-    for image_path in image_paths:
-        images.append(np.load(image_path))
-
-    min_val = np.min(images, axis=(0, 2, 3))
-    max_val = np.max(images, axis=(0, 2, 3))
-    mean = np.mean(images, axis=(0, 2, 3))
-    std = np.std(images, axis=(0, 2, 3))
-
-    return min_val, max_val, mean, std
+from pytorch_msssim import ssim
 
 
 # 从.txt获取训练集、验证集和测试集的数据编号
@@ -79,14 +66,8 @@ def gradient_penalty(critic, real, fake, device='cpu'):
 
 
 def generated_S2_to_rgb(generated_S2_image):
-    S2_mean = np.array([978.63, 1200.54, 1157.47])[:, np.newaxis, np.newaxis]
-    S2_std = np.array([576.95, 588.16, 634.96])[:, np.newaxis, np.newaxis]
-    rgb = generated_S2_image[:, :3, :, :].cpu().numpy()
-    rgb = np.squeeze(rgb)
+    rgb = generated_S2_image[:, :3, :, :]
     rgb = rgb[:, [2, 1, 0], :, :]
-    rgb = rgb * S2_std + S2_mean
-    rgb = np.clip(rgb, 0, 10000)
-    rgb = (rgb - np.min(rgb)) / (np.max(rgb) - np.min(rgb))
     return rgb
 
 
@@ -102,40 +83,21 @@ def L1_Loss_for_bands(prediction, target):
     return L1_loss_bands
 
 
-def calc_metric(prediction, target, max_value, data_range, output="bands"):
-    prediction = np.array(prediction)
-    target = np.array(target)
+def calc_metric(prediction, target, max_value=1, data_range=1):
+    # calculate MAE
+    mae = torch.abs(prediction - target).mean()
 
-    band_num = prediction.shape[1]
-    mae_bands = np.zeros(band_num)
-    rmse_bands = np.zeros(band_num)
-    psnr_bands = np.zeros(band_num)
-    ssim_bands = np.zeros(band_num)
+    # calculate MSE
+    mse = ((prediction - target) ** 2).mean()
 
-    for i in range(band_num):
-        target_band = np.squeeze(target[:, i, :, :])
-        prediction_band = np.squeeze(prediction[:, i, :, :])
+    # calculate PSNR
+    rmse = torch.sqrt(mse)
+    psnr = 20 * torch.log10(max_value / rmse)
 
-        # calculate MAE
-        mae = np.abs(target_band - prediction_band).mean()
-        mae_bands[i] = mae
+    # calculate SSIM
+    ssim_value = ssim((prediction+1)/2, (target+1)/2, data_range=data_range)
 
-        # calculate RMSE
-        rmse = np.sqrt(((target_band - prediction_band) ** 2).mean())
-        rmse_bands[i] = rmse
-
-        # calculate PSNR
-        psnr = 20 * np.log10(max_value / rmse)
-        psnr_bands[i] = psnr
-
-        # calculate SSIM
-        ssim = structural_similarity(target_band, prediction_band, data_range=data_range)
-        ssim_bands[i] = ssim
-
-    if output == "bands":
-        return mae_bands, rmse_bands, psnr_bands, ssim_bands
-    elif output == "mean":
-        return mae_bands.mean(), rmse_bands.mean(), psnr_bands.mean(), ssim_bands.mean()
+    return mae, mse, psnr, ssim_value
 
 
 def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):

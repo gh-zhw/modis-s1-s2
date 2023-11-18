@@ -1,7 +1,7 @@
 import numpy as np
 
 # 数据集总数
-N = 2200
+N = 2194
 
 data_index = np.arange(N)
 np.random.shuffle(data_index)
