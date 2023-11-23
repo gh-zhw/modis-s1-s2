@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import torchvision
-from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from model import *
 from load_dataset import get_dataloader, get_dataset
@@ -13,15 +12,26 @@ batch_size = 12
 
 train_dataloader, val_dataloader, _ = get_dataloader(batch_size, *get_dataset())
 
+try:
+    checkpoint = torch.load(r"D:\Code\MODIS_S1_S2\checkpoint\pre_train_checkpoint_epoch_2.pth")
+except FileNotFoundError:
+    checkpoint = None
+
 generator = Generator()
 generator = generator.to(device)
 
-g_lr = 3e-4
+g_lr = 1e-4
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
-g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=50, gamma=1)
+
+if checkpoint is not None:
+    print("Load checkpoint.")
+    generator.load_state_dict(checkpoint["model"])
+    g_optimizer.load_state_dict(checkpoint["optimizer"])
+else:
+    print("No such checkpoint.")
 
 # tensorboard
-writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\\")
+writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\pre_train")
 
 train_loss_dict = {"train_loss": [], "L1_loss": [], "L2_loss": [], "L_loss_band_1": [],
                    "L_loss_band_2": [], "L_loss_band_3": [], "L_loss_band_4": [], "L_loss_band_5": [],
@@ -30,8 +40,8 @@ val_loss_dict = {"val_loss": [], "L1_loss": [], "L2_loss": [], "L_loss_band_1": 
                  "L_loss_band_2": [], "L_loss_band_3": [], "L_loss_band_4": [], "L_loss_band_5": [],
                  "L_loss_band_6": [], "L_loss_band_7": [], "L_loss_band_8": []}
 
-LAMBDA_L1 = 0.5
-LAMBDA_L2 = 0.5
+LAMBDA_L1 = 0.9
+LAMBDA_L2 = 1 - LAMBDA_L1
 
 epochs = 50
 step = 0
@@ -44,13 +54,14 @@ for epoch in range(epochs):
     # train
     generator.train()
     for mini_batch in train_dataloader:
-        MODIS_image, S1_image, S2_image = mini_batch
+        MODIS_image, S1_image, S2_image, ref_image = mini_batch
         MODIS_image = MODIS_image.to(device)
         S1_image = S1_image.to(device)
         real_S2_image = S2_image.to(device)
+        ref_image = ref_image.to(device)
 
         # generated fake image
-        generated_S2_image = generator(MODIS_image, S1_image)
+        generated_S2_image = generator(MODIS_image, S1_image, ref_image)
 
         # calculate L2_loss for bands
         L2_loss_bands = L2_Loss_for_bands(generated_S2_image, real_S2_image)
@@ -69,7 +80,7 @@ for epoch in range(epochs):
         g_loss.backward()
         g_optimizer.step()
 
-        if step % 20 == 0:
+        if step % 50 == 0:
             end_time = time.time()
             print("[step {}/{}] train_L_loss = {} | L1_loss = {} | L2_loss = {}  {}s".format(
                 step, total_step, L_loss.item(), L1_loss.item(), L2_loss.item(), round(end_time - start_time, 2)))
@@ -88,8 +99,6 @@ for epoch in range(epochs):
 
         step += 1
 
-    g_scheduler.step()
-
     # validate
     generator.eval()
     flag = True
@@ -98,15 +107,16 @@ for epoch in range(epochs):
     val_L_loss = torch.zeros(1).to(device)
     val_L1_loss = torch.zeros(1).to(device)
     val_L2_loss = torch.zeros(1).to(device)
-    metric = {"mae": 0, "mse": 0, "psnr": 0, "ssim": 0}
+    metric = {"mae": 0, "mse": 0, "sam": 0, "psnr": 0, "ssim": 0}
     for mini_batch in val_dataloader:
-        MODIS_image, S1_image, S2_image = mini_batch
+        MODIS_image, S1_image, S2_image, ref_image = mini_batch
         MODIS_image = MODIS_image.to(device)
         S1_image = S1_image.to(device)
         real_S2_image = S2_image.to(device)
+        ref_image = ref_image.to(device)
 
         with torch.no_grad():
-            generated_S2_image = generator(MODIS_image, S1_image)
+            generated_S2_image = generator(MODIS_image, S1_image, ref_image)
             if flag:
                 fake_S2_rgb = generated_S2_to_rgb(generated_S2_image[:4])
                 real_S2_rgb = generated_S2_to_rgb(real_S2_image[:4])
@@ -132,13 +142,15 @@ for epoch in range(epochs):
         val_L1_loss += (L1_loss / val_data_len)
         val_L2_loss += (L2_loss / val_data_len)
 
-        mae, mse, psnr, ssim_value = calc_metric(generated_S2_image, real_S2_image, 1, 1)
+        mae, mse, sam, psnr, ssim_value = calc_metric(generated_S2_image, real_S2_image, 1, 1)
         metric["mae"] += (mae / val_data_len)
         metric["mse"] += (mse / val_data_len)
+        metric["sam"] += (sam / val_data_len)
         metric["psnr"] += (psnr / val_data_len)
         metric["ssim"] += (ssim_value / val_data_len)
 
-    print("val_L_loss = {} | L1_loss = {} | L2_loss = {}".format(val_L_loss.item(), val_L1_loss.item(), val_L2_loss.item()))
+    print("val_L_loss = {} | L1_loss = {} | L2_loss = {}".format(val_L_loss.item(), val_L1_loss.item(),
+                                                                 val_L2_loss.item()))
     for key, value in metric.items():
         print(f"{key}: {value.item()} | ", end="")
     print()
@@ -152,16 +164,29 @@ for epoch in range(epochs):
     writer.add_scalar("val_L_loss", val_L_loss, epoch)
     writer.add_scalar("val_L1_loss", val_L1_loss, epoch)
     writer.add_scalar("val_L2_loss", val_L2_loss, epoch)
-    for band in range(val_L_loss_bands.shape[0]):
-        writer.add_scalar("val_L_loss_band_" + str(band + 1), val_L_loss_bands[band].item(), epoch)
+    writer.add_scalar("SAM", metric["sam"], epoch)
+    writer.add_scalar("PSNR", metric["psnr"], epoch)
+    writer.add_scalar("SSIM", metric["ssim"], epoch)
+    # for band in range(val_L_loss_bands.shape[0]):
+    #     writer.add_scalar("val_L_loss_band_" + str(band + 1), val_L_loss_bands[band].item(), epoch)
 
-    if ((epoch+1) % 50 == 0 and epoch > 0) or epoch == epochs - 1:
-        torch.save(generator, f"D:\Code\MODIS_S1_S2\model\pre_train_generator_epoch_{epoch+1}.pth")
+    # if ((epoch+1) % 50 == 0 and epoch > 0) or epoch == epochs - 1:
+    #     torch.save(generator, f"D:\Code\MODIS_S1_S2\model\pre_train_generator_epoch_{epoch+1}.pth")
+    #     print("Model saved.")
+
+    if ((epoch + 1) % 10 == 0 and epoch > 0) or epoch == epochs - 1:
+        torch.save(
+            {
+                "model": generator.state_dict(),
+                "optimizer": g_optimizer.state_dict(),
+            },
+            f"D:\Code\MODIS_S1_S2\checkpoint\pre_train_checkpoint_epoch_{epoch + 1}.pth")
+        print("Checkpoint saved.")
 
 writer.close()
 
-np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_train_loss.npy", train_loss_dict)
-np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss.npy", val_loss_dict)
+# np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_train_loss.npy", train_loss_dict)
+# np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss.npy", val_loss_dict)
 
 if __name__ == '__main__':
     pass

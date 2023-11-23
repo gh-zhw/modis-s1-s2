@@ -28,19 +28,30 @@ def get_image_path():
     train_MODIS_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\train\MODIS\MODIS_"
     train_S1_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\train\S1\S1_"
     train_S2_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\train\S2\S2_"
+    train_ref_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\train\ref\ref_"
 
     test_MODIS_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\test\MODIS\MODIS_"
     test_S1_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\test\S1\S1_"
     test_S2_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\test\S2\S2_"
+    test_ref_dir = r"D:\Code\MODIS_S1_S2\dataset\SatelliteImages\test\ref\ref_"
 
     train_data_index, val_data_index, test_data_index = get_data_index()
     train_image_paths, val_image_paths, test_image_paths = [], [], []
     for index in train_data_index:
-        train_image_paths.append([train_MODIS_dir + index + ".npy", train_S1_dir + index + ".npy", train_S2_dir + index + ".npy"])
+        train_image_paths.append([train_MODIS_dir + index + ".npy",
+                                  train_S1_dir + index + ".npy",
+                                  train_S2_dir + index + ".npy",
+                                  train_ref_dir + index + ".npy"])
     for index in val_data_index:
-        val_image_paths.append([train_MODIS_dir + index + ".npy", train_S1_dir + index + ".npy", train_S2_dir + index + ".npy"])
+        val_image_paths.append([train_MODIS_dir + index + ".npy",
+                                train_S1_dir + index + ".npy",
+                                train_S2_dir + index + ".npy",
+                                train_ref_dir + index + ".npy"])
     for index in test_data_index:
-        test_image_paths.append([test_MODIS_dir + index + ".npy", test_S1_dir + index + ".npy", test_S2_dir + index + ".npy"])
+        test_image_paths.append([test_MODIS_dir + index + ".npy",
+                                 test_S1_dir + index + ".npy",
+                                 test_S2_dir + index + ".npy",
+                                 test_ref_dir + index + ".npy"])
 
     return train_image_paths, val_image_paths, test_image_paths
 
@@ -83,21 +94,37 @@ def L1_Loss_for_bands(prediction, target):
     return L1_loss_bands
 
 
+def spectral_angle_mapper(image1, image2):
+    image1_flat = image1.view(image1.size(0), -1)
+    image2_flat = image2.view(image2.size(0), -1)
+
+    image1_unit = image1_flat / torch.norm(image1_flat, p=2, dim=1, keepdim=True)
+    image2_unit = image2_flat / torch.norm(image2_flat, p=2, dim=1, keepdim=True)
+
+    cos_theta = torch.sum(image1_unit * image2_unit, dim=1)
+    angle = torch.acos(cos_theta).mean()
+
+    return torch.rad2deg(angle)
+
+
 def calc_metric(prediction, target, max_value=1, data_range=1):
-    # calculate MAE
+    # MAE
     mae = torch.abs(prediction - target).mean()
 
-    # calculate MSE
+    # MSE
     mse = ((prediction - target) ** 2).mean()
 
-    # calculate PSNR
+    # SAM
+    sam = spectral_angle_mapper(prediction, target)
+
+    # PSNR
     rmse = torch.sqrt(mse)
     psnr = 20 * torch.log10(max_value / rmse)
 
-    # calculate SSIM
-    ssim_value = ssim((prediction+1)/2, (target+1)/2, data_range=data_range)
+    # SSIM
+    ssim_value = ssim((prediction + 1) / 2, (target + 1) / 2, data_range=data_range)
 
-    return mae, mse, psnr, ssim_value
+    return mae, mse, sam, psnr, ssim_value
 
 
 def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
@@ -121,7 +148,13 @@ def plot_loss(loss_npy, loss_pic_dir, x_label, xtick_gain=1):
 
 
 if __name__ == '__main__':
-    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_train_loss.npy",
-              r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
-    plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_val_loss.npy",
-              r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
+    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_train_loss.npy",
+    #           r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="step", xtick_gain=10)
+    # plot_loss(r"D:\Code\MODIS_S1_S2\output\loss\test\Instance Normalization\pre_train_generator_val_loss.npy",
+    #           r"D:\Code\MODIS_S1_S2\output\loss\loss_plot\\", x_label="epoch")
+
+    a = torch.rand((12, 8, 250, 250))
+    b = torch.ones((12, 8, 250, 250))
+
+    mae, mse, sam, psnr, ssim_value = calc_metric(a, b)
+    print(mae, mse, sam, psnr, ssim_value)

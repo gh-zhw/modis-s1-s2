@@ -8,17 +8,17 @@ class ConvBlock(nn.Module):
 
         self.is_norm = is_norm
         self.conv_1 = nn.Conv2d(in_channel, out_channel, kernel_size, stride, padding, bias=False)
-        self.norm = nn.BatchNorm2d(out_channel)
-        self.activation = nn.ReLU(inplace=True)
+        self.norm = nn.InstanceNorm2d(out_channel)
+        self.activation = nn.LeakyReLU(0.1, inplace=True)
         self.conv_2 = nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=False)
 
     def forward(self, x):
-        x = self.conv_1(x)
+        out = self.conv_1(x)
         if self.is_norm:
-            x = self.norm(x)
-        x = self.activation(x)
-        output = self.conv_2(x)
-        return output
+            out = self.norm(out)
+        out = self.activation(out)
+        out = self.conv_2(out)
+        return out
 
 
 class DeconvBlock(nn.Module):
@@ -27,17 +27,17 @@ class DeconvBlock(nn.Module):
 
         self.is_norm = is_norm
         self.deconv = nn.ConvTranspose2d(in_channel, out_channel, kernel_size, stride, padding, bias=False)
-        self.norm = nn.BatchNorm2d(out_channel)
-        self.activation = nn.ReLU(inplace=True)
+        self.norm = nn.InstanceNorm2d(out_channel)
+        self.activation = nn.LeakyReLU(0.1, inplace=True)
         self.conv = nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=False)
 
     def forward(self, x):
-        x = self.deconv(x)
+        out = self.deconv(x)
         if self.is_norm:
-            x = self.norm(x)
-        x = self.activation(x)
-        output = self.conv(x)
-        return output
+            out = self.norm(out)
+        out = self.activation(out)
+        output = self.conv(out)
+        return out
 
 
 class UpsampleBlock(nn.Module):
@@ -47,18 +47,18 @@ class UpsampleBlock(nn.Module):
         self.is_norm = is_norm
         self.upsample = nn.Upsample(size=out_size, mode='nearest')
         self.conv_1 = nn.Conv2d(in_channel, out_channel, 3, 1, 1, bias=False)
-        self.norm = nn.BatchNorm2d(out_channel)
-        self.activation = nn.ReLU(inplace=True)
+        self.norm = nn.InstanceNorm2d(out_channel)
+        self.activation = nn.LeakyReLU(0.1, inplace=True)
         self.conv_2 = nn.Conv2d(out_channel, out_channel, 1, 1, 0, bias=False)
 
     def forward(self, x):
-        x = self.upsample(x)
-        x = self.conv_1(x)
+        out = self.upsample(x)
+        out = self.conv_1(out)
         if self.is_norm:
-            x = self.norm(x)
-        x = self.activation(x)
-        output = self.conv_2(x)
-        return output
+            out = self.norm(out)
+        out = self.activation(out)
+        out = self.conv_2(out)
+        return out
 
 
 class ChannelAttention(nn.Module):
@@ -111,13 +111,13 @@ class ConvCBAMBlock(nn.Module):
         super().__init__()
         self.conv = ConvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=is_norm)
         self.CBAM = CBAM(out_channel)
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
-        x = self.conv(x)
-        x = self.CBAM(x)
-        output = self.relu(x)
-        return output
+        out = self.conv(x)
+        out = self.CBAM(out)
+        out = self.activation(out)
+        return out
 
 
 class DeconvCBAMBlock(nn.Module):
@@ -125,13 +125,13 @@ class DeconvCBAMBlock(nn.Module):
         super().__init__()
         self.deconv = DeconvBlock(in_channel, out_channel, kernel_size, stride, padding, is_norm=is_norm)
         self.CBAM = CBAM(out_channel)
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
-        x = self.deconv(x)
-        x = self.CBAM(x)
-        output = self.relu(x)
-        return output
+        out = self.deconv(x)
+        out = self.CBAM(out)
+        out = self.activation(out)
+        return out
 
 
 class UpsampleCBAMBlock(nn.Module):
@@ -139,13 +139,13 @@ class UpsampleCBAMBlock(nn.Module):
         super().__init__()
         self.upsample = UpsampleBlock(in_channel, out_channel, out_size, is_norm=is_norm)
         self.CBAM = CBAM(out_channel)
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
-        x = self.upsample(x)
-        x = self.CBAM(x)
-        output = self.relu(x)
-        return output
+        out = self.upsample(x)
+        out = self.CBAM(out)
+        out = self.activation(out)
+        return out
 
 
 if __name__ == '__main__':
