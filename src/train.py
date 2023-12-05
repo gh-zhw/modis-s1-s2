@@ -2,21 +2,19 @@ import time
 import numpy as np
 import torch
 import torchvision
-from torch.nn.functional import interpolate
-from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from model import *
 from load_dataset import get_dataloader, get_dataset
-from utils import generated_S2_to_rgb, gradient_penalty, L1_Loss_for_bands, L2_Loss_for_bands, calc_metric
+from utils import generated_S2_to_rgb, gradient_penalty, L1_Loss_for_bands, calc_metric
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-batch_size = 4
+batch_size = 8
 
 train_dataloader, val_dataloader, _ = get_dataloader(batch_size, *get_dataset())
 
 try:
-    checkpoint = torch.load(r"D:\Code\MODIS_S1_S2\checkpoint\checkpoint_epoch_2.pth")
+    checkpoint = torch.load(r"D:\Code\modis-s1-s2\checkpoint\checkpoint_epoch_0.pth")
 except FileNotFoundError:
     checkpoint = None
 
@@ -25,10 +23,10 @@ discriminator = Discriminator()
 generator = generator.to(device)
 discriminator = discriminator.to(device)
 
-g_lr = 1e-4
-d_lr = 1e-4
-g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
-d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_lr)
+g_lr = 3e-4
+d_lr = 3e-4
+g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
+d_optimizer = torch.optim.SGD(discriminator.parameters(), lr=d_lr)
 
 if checkpoint is not None:
     print("Load checkpoint.")
@@ -36,10 +34,12 @@ if checkpoint is not None:
     discriminator.load_state_dict(checkpoint["discriminator"])
     g_optimizer.load_state_dict(checkpoint["g_optimizer"])
     d_optimizer.load_state_dict(checkpoint["d_optimizer"])
+else:
+    print("No such checkpoint.")
 
 
 # tensorboard
-writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\wgan")
+writer = SummaryWriter(r"D:\Code\modis-s1-s2\logs\wgan")
 
 train_loss = {"g_loss": [], "d_loss": [], "W_dis": [], "L_loss": [], "L_loss_band_1": [],
               "L_loss_band_2": [], "L_loss_band_3": [], "L_loss_band_4": [], "L_loss_band_5": [],
@@ -49,13 +49,14 @@ val_loss = {"L_loss": [], "L_loss_band_1": [], "L_loss_band_2": [], "L_loss_band
             "L_loss_band_8": []}
 
 LAMBDA_GP = 10
-LAMBDA_L1 = 0.2
+LAMBDA_g_loss = 1e-3
 
-epochs = 100
-step = 0
-total_step = epochs * len(train_dataloader)
+start_epoch = checkpoint["epoch"] if checkpoint is not None else 0
+end_epoch = 100
+step = start_epoch * len(train_dataloader)
+total_step = end_epoch * len(train_dataloader)
 start_time = time.time()
-for epoch in range(epochs):
+for epoch in range(start_epoch, end_epoch):
     print("=" * 30 + f" epoch {epoch + 1} " + "=" * 30)
     print("Current G learning rate:", g_optimizer.param_groups[0]['lr'])
     print("Current D learning rate:", d_optimizer.param_groups[0]['lr'])
@@ -73,15 +74,9 @@ for epoch in range(epochs):
         # generated fake image
         generated_S2_image = generator(MODIS_image, S1_image, ref_image)
 
-        # upsample MODIS(5*5) to MODIS_upsamped(250*250)
-        MODIS_image_upsampled = interpolate(MODIS_image, size=250, mode="nearest").requires_grad_(True)
-
-        d_fake_input = torch.cat((generated_S2_image.detach(), S1_image, MODIS_image_upsampled), dim=1)
-        d_real_input = torch.cat((real_S2_image, S1_image, MODIS_image_upsampled), dim=1)
-
-        gp = gradient_penalty(discriminator, d_real_input, d_fake_input, device=device)
-        d_fake_loss = torch.mean(discriminator(d_fake_input))
-        d_real_loss = -torch.mean(discriminator(d_real_input))
+        gp = gradient_penalty(discriminator, real_S2_image, generated_S2_image, device=device)
+        d_fake_loss = torch.mean(discriminator(generated_S2_image))
+        d_real_loss = -torch.mean(discriminator(real_S2_image))
         d_loss = d_fake_loss + d_real_loss + LAMBDA_GP * gp
         d_optimizer.zero_grad()
         d_loss.backward(retain_graph=True)
@@ -90,25 +85,20 @@ for epoch in range(epochs):
         wasserstein_distance = -(d_fake_loss + d_real_loss)
 
         # update G
-        if step % 5 == 0:
-            # calculate L2_loss for bands
-            # L2_loss_bands = L2_Loss_for_bands(generated_S2_image, real_S2_image)
-            # L2_loss = L2_loss_bands.mean()
+        # calculate L1_loss for bands
+        L1_loss_bands = L1_Loss_for_bands(generated_S2_image, real_S2_image)
+        L1_loss = L1_loss_bands.mean()
 
-            # calculate L1_loss for bands
-            L1_loss_bands = L1_Loss_for_bands(generated_S2_image, real_S2_image)
-            L1_loss = L1_loss_bands.mean()
+        L_loss_bands = L1_loss_bands
+        L_loss = L1_loss
 
-            L_loss_bands = L1_loss_bands
-            L_loss = L1_loss
+        g_optimizer.zero_grad()
+        g_loss = -torch.mean(discriminator(generated_S2_image))
+        g_total_loss = LAMBDA_g_loss * g_loss + L_loss
+        g_total_loss.backward()
+        g_optimizer.step()
 
-            g_optimizer.zero_grad()
-            g_loss = -torch.mean(discriminator(d_fake_input))
-            g_total_loss = (1 - LAMBDA_L1) * g_loss + LAMBDA_L1 * L_loss
-            g_loss.backward()
-            g_optimizer.step()
-
-        if step % 100 == 0:
+        if step % 50 == 0:
             end_time = time.time()
             print("[step {}/{}] g_loss = {} | d_loss = {} | W_dis = {} | train_L_loss = {}  {}s".format(
                 step, total_step, g_loss.item(), d_loss.item(), wasserstein_distance.item(), L_loss.item(),
@@ -156,10 +146,6 @@ for epoch in range(epochs):
                 writer.add_image("real_images", real_S2_rbg_grid, epoch)
                 flag = False
 
-        # calculate L2_loss for bands
-        # L2_loss_bands = L2_Loss_for_bands(generated_S2_image, real_S2_image)
-        # L2_loss = L2_loss_bands.mean()
-
         # calculate L1_loss for bands
         L1_loss_bands = L1_Loss_for_bands(generated_S2_image, real_S2_image)
         L1_loss = L1_loss_bands.mean()
@@ -193,26 +179,27 @@ for epoch in range(epochs):
     # for band in range(L_loss_bands.shape[0]):
     #     writer.add_scalar("val_L_loss_band_" + str(band + 1), val_L_loss_bands[band].item(), epoch)
 
-    # if ((epoch+1) % 50 == 0 and epoch > 0) or epoch == epochs-1:
-    #     torch.save(generator, f"D:\Code\MODIS_S1_S2\model\wgan\wgan_generator_epoch_{epoch+1}.pth")
-    #     torch.save(discriminator, f"D:\Code\MODIS_S1_S2\model\wgan\wgan_discriminator_epoch_{epoch+1}.pth")
+    # if ((epoch+1) % 50 == 0 and epoch > 0) or epoch == end_epoch-1:
+    #     torch.save(generator, f"D:\Code\modis-s1-s2\model\wgan\wgan_generator_epoch_{epoch+1}.pth")
+    #     torch.save(discriminator, f"D:\Code\modis-s1-s2\model\wgan\wgan_discriminator_epoch_{epoch+1}.pth")
 
-    if ((epoch + 1) % 10 == 0 and epoch > 0) or epoch == epochs - 1:
+    if ((epoch + 1) % 10 == 0 and epoch > 0) or epoch == end_epoch - 1:
         torch.save(
             {
                 "generator": generator.state_dict(),
                 "discriminator": discriminator.state_dict(),
                 "g_optimizer": g_optimizer.state_dict(),
                 "d_optimizer": d_optimizer.state_dict(),
+                "epoch": epoch + 1,
             },
-            f"D:\Code\MODIS_S1_S2\checkpoint\checkpoint_epoch_{epoch + 1}.pth")
+            f"D:\Code\modis-s1-s2\checkpoint\checkpoint_epoch_{epoch + 1}.pth")
         print("Checkpoint saved.")
 
 
 writer.close()
 
-# np.save(r"D:\Code\MODIS_S1_S2\output\loss\wgan\wgan_train_loss.npy", train_loss)
-# np.save(r"D:\Code\MODIS_S1_S2\output\loss\wgan\wgan_val_loss.npy", val_loss)
+# np.save(r"D:\Code\modis-s1-s2\output\loss\wgan\wgan_train_loss.npy", train_loss)
+# np.save(r"D:\Code\modis-s1-s2\output\loss\wgan\wgan_val_loss.npy", val_loss)
 
 
 if __name__ == '__main__':

@@ -68,7 +68,7 @@ def get_dataset():
     train_image_paths, val_image_paths, test_image_paths = get_image_path()
     train_dataset = SatelliteImageDataset(train_image_paths, transform=transforms, data_augment=True)
     val_dataset = SatelliteImageDataset(val_image_paths, transform=transforms, data_augment=True)
-    test_dataset = SatelliteImageDataset(test_image_paths, transform=transforms, data_augment=True)
+    test_dataset = SatelliteImageDataset(test_image_paths, transform=transforms, data_augment=False)
 
     return train_dataset, val_dataset, test_dataset
 
@@ -76,12 +76,16 @@ def get_dataset():
 def get_dataloader(batch_size, train_dataset, val_dataset, test_dataset):
     train_dataloader = DataLoader(train_dataset, batch_size, shuffle=True, drop_last=False)
     val_dataloader = DataLoader(val_dataset, batch_size, shuffle=True, drop_last=False)
-    test_dataloader = DataLoader(test_dataset, batch_size, shuffle=True, drop_last=False)
+    test_dataloader = DataLoader(test_dataset, batch_size, shuffle=False, drop_last=False)
 
     return train_dataloader, val_dataloader, test_dataloader
 
 
 if __name__ == '__main__':
-    train_dataset, val_dataset, test_dataset = get_dataset()
-    print(len(train_dataset), len(val_dataset), len(test_dataset))
-    print(train_dataset[0][0].shape)
+    # train_dataset, val_dataset, test_dataset = get_dataset()
+    # print(len(train_dataset), len(val_dataset), len(test_dataset))
+    # print(train_dataset[0][0].shape)
+
+    batch_size = 8
+    train_dataloader, val_dataloader, test_dataloader = get_dataloader(batch_size, *get_dataset())
+    print(len(train_dataloader))

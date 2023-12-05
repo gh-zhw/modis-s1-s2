@@ -8,20 +8,21 @@ from utils import generated_S2_to_rgb, L1_Loss_for_bands, L2_Loss_for_bands, cal
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-batch_size = 12
+batch_size = 8
 
 train_dataloader, val_dataloader, _ = get_dataloader(batch_size, *get_dataset())
 
 try:
-    checkpoint = torch.load(r"D:\Code\MODIS_S1_S2\checkpoint\pre_train_checkpoint_epoch_2.pth")
+    checkpoint = torch.load(r"D:\Code\modis-s1-s2\checkpoint\pre_train_checkpoint_epoch_0.pth")
 except FileNotFoundError:
     checkpoint = None
 
 generator = Generator()
 generator = generator.to(device)
 
-g_lr = 1e-4
-g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr)
+g_lr = 3e-4
+g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
+g_scheduler = torch.optim.lr_scheduler.StepLR(g_optimizer, 100, 1)
 
 if checkpoint is not None:
     print("Load checkpoint.")
@@ -31,7 +32,7 @@ else:
     print("No such checkpoint.")
 
 # tensorboard
-writer = SummaryWriter(r"D:\Code\MODIS_S1_S2\logs\pre_train")
+writer = SummaryWriter(r"D:\Code\modis-s1-s2\logs\pre_train")
 
 train_loss_dict = {"train_loss": [], "L1_loss": [], "L2_loss": [], "L_loss_band_1": [],
                    "L_loss_band_2": [], "L_loss_band_3": [], "L_loss_band_4": [], "L_loss_band_5": [],
@@ -40,14 +41,15 @@ val_loss_dict = {"val_loss": [], "L1_loss": [], "L2_loss": [], "L_loss_band_1": 
                  "L_loss_band_2": [], "L_loss_band_3": [], "L_loss_band_4": [], "L_loss_band_5": [],
                  "L_loss_band_6": [], "L_loss_band_7": [], "L_loss_band_8": []}
 
-LAMBDA_L1 = 0.9
+LAMBDA_L1 = 1
 LAMBDA_L2 = 1 - LAMBDA_L1
 
-epochs = 50
-step = 0
-total_step = epochs * len(train_dataloader)
+start_epoch = checkpoint["epoch"] if checkpoint is not None else 0
+end_epoch = 100
+step = start_epoch * len(train_dataloader)
+total_step = end_epoch * len(train_dataloader)
 start_time = time.time()
-for epoch in range(epochs):
+for epoch in range(start_epoch, end_epoch):
     print("=" * 30 + f" epoch {epoch + 1} " + "=" * 30)
     print("Current learning rate:", g_optimizer.param_groups[0]['lr'])
 
@@ -98,6 +100,8 @@ for epoch in range(epochs):
             #     writer.add_scalar("train_L_loss_band_" + str(band + 1), L_loss_bands[band].item(), step)
 
         step += 1
+
+    g_scheduler.step()
 
     # validate
     generator.eval()
@@ -170,23 +174,24 @@ for epoch in range(epochs):
     # for band in range(val_L_loss_bands.shape[0]):
     #     writer.add_scalar("val_L_loss_band_" + str(band + 1), val_L_loss_bands[band].item(), epoch)
 
-    # if ((epoch+1) % 50 == 0 and epoch > 0) or epoch == epochs - 1:
-    #     torch.save(generator, f"D:\Code\MODIS_S1_S2\model\pre_train_generator_epoch_{epoch+1}.pth")
+    # if ((epoch+1) % 50 == 0 and epoch > 0) or epoch == end_epoch - 1:
+    #     torch.save(generator, f"D:\Code\modis-s1-s2\model\pre_train_generator_epoch_{epoch+1}.pth")
     #     print("Model saved.")
 
-    if ((epoch + 1) % 10 == 0 and epoch > 0) or epoch == epochs - 1:
+    if ((epoch + 1) % 10 == 0 and epoch > 0) or epoch == end_epoch - 1:
         torch.save(
             {
                 "model": generator.state_dict(),
                 "optimizer": g_optimizer.state_dict(),
+                "epoch": epoch + 1
             },
-            f"D:\Code\MODIS_S1_S2\checkpoint\pre_train_checkpoint_epoch_{epoch + 1}.pth")
+            f"D:\Code\modis-s1-s2\checkpoint\pre_train_checkpoint_epoch_{epoch + 1}.pth")
         print("Checkpoint saved.")
 
 writer.close()
 
-# np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_train_loss.npy", train_loss_dict)
-# np.save(r"D:\Code\MODIS_S1_S2\output\loss\pre_train_generator_val_loss.npy", val_loss_dict)
+# np.save(r"D:\Code\modis-s1-s2\output\loss\pre_train_generator_train_loss.npy", train_loss_dict)
+# np.save(r"D:\Code\modis-s1-s2\output\loss\pre_train_generator_val_loss.npy", val_loss_dict)
 
 if __name__ == '__main__':
     pass

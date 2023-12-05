@@ -115,23 +115,23 @@ class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.model = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
-            nn.LayerNorm([32, 125, 125]),
+            nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1),
+            nn.LayerNorm([16, 125, 125]),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=2),
-            nn.LayerNorm([64, 64, 64]),
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=2),
+            nn.LayerNorm([32, 64, 64]),
             nn.LeakyReLU(inplace=True),
-            nn.Conv2d(64, 32, kernel_size=3, stride=2, padding=1),
-            nn.LayerNorm([32, 32, 32]),
-            nn.LeakyReLU(inplace=True),
-            nn.Conv2d(32, 16, kernel_size=2, stride=2, padding=0),
-            nn.LayerNorm([16, 16, 16]),
+            nn.Conv2d(32, 16, kernel_size=3, stride=2, padding=1),
+            nn.LayerNorm([16, 32, 32]),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(16, 8, kernel_size=2, stride=2, padding=0),
-            nn.LayerNorm([8, 8, 8]),
+            nn.LayerNorm([8, 16, 16]),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(8, 4, kernel_size=2, stride=2, padding=0),
+            nn.LayerNorm([4, 8, 8]),
             nn.LeakyReLU(inplace=True),
             nn.Flatten(),
-            nn.Linear(512, 1),
+            nn.Linear(256, 1),
             # nn.Sigmoid()
         )
 
@@ -153,6 +153,6 @@ class GAN(nn.Module):
 if __name__ == '__main__':
     g = Generator()
     d = Discriminator()
-    summary(g.cuda(), [(6, 5, 5), (2, 250, 250), (8, 250, 250)], 8)
-    # summary(d.cuda(), (16, 250, 250), 8)
+    # summary(g.cuda(), [(6, 5, 5), (2, 250, 250), (8, 250, 250)], 8)
+    summary(d.cuda(), (8, 250, 250), 8)
 

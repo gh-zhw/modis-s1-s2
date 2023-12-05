@@ -1,4 +1,5 @@
 import numpy as np
+import config
 
 # 数据集总数
 N = 2194
@@ -19,6 +20,6 @@ def data_index_to_txt(data_index, txt_path):
 
 
 if __name__ == "__main__":
-    # data_index_to_txt(train_data_index, r"D:\Code\MODIS_S1_S2\dataset\ImageSets\train.txt")
-    # data_index_to_txt(val_data_index, r"D:\Code\MODIS_S1_S2\dataset\ImageSets\val.txt")
-    data_index_to_txt(test_data_index, r"D:\Code\MODIS_S1_S2\dataset\ImageSets\test.txt")
+    # data_index_to_txt(train_data_index, config.train_data_index_txt)
+    # data_index_to_txt(val_data_index, config.val_data_index_txt)
+    data_index_to_txt(test_data_index, config.test_data_index_txt)
