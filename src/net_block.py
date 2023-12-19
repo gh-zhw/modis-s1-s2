@@ -36,7 +36,7 @@ class DeconvBlock(nn.Module):
         if self.is_norm:
             out = self.norm(out)
         out = self.activation(out)
-        output = self.conv(out)
+        out = self.conv(out)
         return out
 
 

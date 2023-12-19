@@ -14,7 +14,7 @@ batch_size = 8
 train_dataloader, val_dataloader, _ = get_dataloader(batch_size, *get_dataset())
 
 try:
-    checkpoint = torch.load(r"D:\Code\modis-s1-s2\checkpoint\checkpoint_epoch_0.pth")
+    checkpoint = torch.load(r"D:\Code\modis-s1-s2\checkpoint\checkpoint_epoch_300.pth")
 except FileNotFoundError:
     checkpoint = None
 
@@ -23,8 +23,8 @@ discriminator = Discriminator()
 generator = generator.to(device)
 discriminator = discriminator.to(device)
 
-g_lr = 3e-4
-d_lr = 3e-4
+g_lr = 2e-4
+d_lr = 2e-4
 g_optimizer = torch.optim.Adam(generator.parameters(), lr=g_lr, betas=(0.5, 0.999))
 d_optimizer = torch.optim.SGD(discriminator.parameters(), lr=d_lr)
 
@@ -52,7 +52,7 @@ LAMBDA_GP = 10
 LAMBDA_g_loss = 1e-3
 
 start_epoch = checkpoint["epoch"] if checkpoint is not None else 0
-end_epoch = 100
+end_epoch = 300
 step = start_epoch * len(train_dataloader)
 total_step = end_epoch * len(train_dataloader)
 start_time = time.time()
@@ -65,14 +65,15 @@ for epoch in range(start_epoch, end_epoch):
     generator.train()
     discriminator.train()
     for mini_batch in train_dataloader:
-        MODIS_image, S1_image, S2_image, ref_image = mini_batch
+        MODIS_image, S1_image, S2_image, before_image, after_image = mini_batch
         MODIS_image = MODIS_image.to(device)
         S1_image = S1_image.to(device)
         real_S2_image = S2_image.to(device)
-        ref_image = ref_image.to(device)
+        before_image = before_image.to(device)
+        after_image = after_image.to(device)
 
         # generated fake image
-        generated_S2_image = generator(MODIS_image, S1_image, ref_image)
+        generated_S2_image = generator(MODIS_image, S1_image, before_image, after_image)
 
         gp = gradient_penalty(discriminator, real_S2_image, generated_S2_image, device=device)
         d_fake_loss = torch.mean(discriminator(generated_S2_image))
@@ -129,14 +130,15 @@ for epoch in range(start_epoch, end_epoch):
     val_L_loss = torch.zeros(1).to(device)
     metric = {"mae": 0, "mse": 0, "sam": 0, "psnr": 0, "ssim": 0}
     for mini_batch in val_dataloader:
-        MODIS_image, S1_image, S2_image, ref_image = mini_batch
+        MODIS_image, S1_image, S2_image, before_image, after_image = mini_batch
         MODIS_image = MODIS_image.to(device)
         S1_image = S1_image.to(device)
         real_S2_image = S2_image.to(device)
-        ref_image = ref_image.to(device)
+        before_image = before_image.to(device)
+        after_image = after_image.to(device)
 
         with torch.no_grad():
-            generated_S2_image = generator(MODIS_image, S1_image, ref_image)
+            generated_S2_image = generator(MODIS_image, S1_image, before_image, after_image)
             if flag:
                 fake_S2_rgb = generated_S2_to_rgb(generated_S2_image[:4])
                 real_S2_rgb = generated_S2_to_rgb(real_S2_image[:4])
@@ -157,15 +159,15 @@ for epoch in range(start_epoch, end_epoch):
         val_L_loss += (L_loss / val_data_len)
 
         mae, mse, sam, psnr, ssim_value = calc_metric(generated_S2_image, real_S2_image, 1, 1)
-        metric["mae"] += (mae / val_data_len)
-        metric["mse"] += (mse / val_data_len)
-        metric["sam"] += (sam / val_data_len)
-        metric["psnr"] += (psnr / val_data_len)
-        metric["ssim"] += (ssim_value / val_data_len)
+        metric["mae"] += (mae / val_data_len).item()
+        metric["mse"] += (mse / val_data_len).item()
+        metric["sam"] += (sam / val_data_len).item()
+        metric["psnr"] += (psnr / val_data_len).item()
+        metric["ssim"] += (ssim_value / val_data_len).item()
 
     print(f"val_L_loss：{val_L_loss.item()}")
     for key, value in metric.items():
-        print(f"{key}: {value.item()} | ", end="")
+        print(f"{key}: {value} | ", end="")
     print()
 
     val_loss["L_loss"].append(val_L_loss.item())

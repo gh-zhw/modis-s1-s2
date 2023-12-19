@@ -9,7 +9,7 @@ np.random.shuffle(data_index)
 
 train_data_index = data_index[:int(N * 0.9)]
 val_data_index = data_index[int(N * 0.9):]
-test_data_index = list(range(2194, 2259))
+test_data_index = list(range(2194, 2260))
 print(len(train_data_index), len(val_data_index))
 
 

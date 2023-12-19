@@ -27,12 +27,16 @@ def get_image_path():
     train_MODIS_dir = config.train_MODIS_dir
     train_S1_dir = config.train_S1_dir
     train_S2_dir = config.train_S2_dir
-    train_ref_dir = config.train_ref_dir
+    # train_ref_dir = config.train_ref_dir
+    train_before_dir = config.train_before_dir
+    train_after_dir = config.train_after_dir
 
     test_MODIS_dir = config.test_MODIS_dir
     test_S1_dir = config.test_S1_dir
     test_S2_dir = config.test_S2_dir
-    test_ref_dir = config.test_ref_dir
+    # test_ref_dir = config.test_ref_dir
+    test_before_dir = config.test_before_dir
+    test_after_dir = config.test_after_dir
 
     train_data_index, val_data_index, test_data_index = get_data_index()
     train_image_paths, val_image_paths, test_image_paths = [], [], []
@@ -40,17 +44,23 @@ def get_image_path():
         train_image_paths.append([train_MODIS_dir + index + ".npy",
                                   train_S1_dir + index + ".npy",
                                   train_S2_dir + index + ".npy",
-                                  train_ref_dir + index + ".npy"])
+                                  #   train_ref_dir + index + ".npy",
+                                  train_before_dir + index + ".npy",
+                                  train_after_dir + index + ".npy"])
     for index in val_data_index:
         val_image_paths.append([train_MODIS_dir + index + ".npy",
                                 train_S1_dir + index + ".npy",
                                 train_S2_dir + index + ".npy",
-                                train_ref_dir + index + ".npy"])
+                                # train_ref_dir + index + ".npy",
+                                train_before_dir + index + ".npy",
+                                train_after_dir + index + ".npy"])
     for index in test_data_index:
         test_image_paths.append([test_MODIS_dir + index + ".npy",
                                  test_S1_dir + index + ".npy",
                                  test_S2_dir + index + ".npy",
-                                 test_ref_dir + index + ".npy"])
+                                 #  test_ref_dir + index + ".npy",
+                                 test_before_dir + index + ".npy",
+                                 test_after_dir + index + ".npy"])
 
     return train_image_paths, val_image_paths, test_image_paths
 
@@ -126,6 +136,7 @@ def calc_metric(prediction, target, max_value=1, data_range=1):
     ssim_value = ssim(denormalied_prediction, denormalized_target, data_range=data_range)
 
     return mae, mse, sam, psnr, ssim_value
+
 
 if __name__ == '__main__':
     a = torch.rand((12, 8, 250, 250))
