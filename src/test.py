@@ -21,9 +21,9 @@ metric = {"mae": 0, "mse": 0, "sam": 0, "psnr": 0, "ssim": 0}
 step = 0
 for mini_batch in val_dataloader:
     MODIS_image, S1_image, S2_image, before_image, after_image = mini_batch
-    # MODIS_image = MODIS_image.to(device)
+    MODIS_image = MODIS_image.to(device)
     # MODIS_image = torch.randn(MODIS_image.shape, dtype=torch.float32, device=device)
-    # S1_image = S1_image.to(device)
+    S1_image = S1_image.to(device)
     # S1_image = torch.randn(S1_image.shape, dtype=torch.float32, device=device)
     real_S2_image = S2_image.to(device)
     before_image = before_image.to(device)
