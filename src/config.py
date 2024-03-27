@@ -1,5 +1,4 @@
 # Dataset Config
-# divide_dataset.py
 train_data_index_txt = r"D:\Code\modis-s1-s2\dataset\ImageSets\train.txt"
 val_data_index_txt = r"D:\Code\modis-s1-s2\dataset\ImageSets\val.txt"
 test_data_index_txt = r"D:\Code\modis-s1-s2\dataset\ImageSets\test.txt"
